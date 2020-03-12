@@ -29,7 +29,7 @@ function createWindow() {
   BrowserWindow.addDevToolsExtension(
     path.join(
       os.homedir(),
-      ".config/google-chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.4.0_0"
+      ".config/google-chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.5.0_0"
     )
   );
 
@@ -72,7 +72,7 @@ ipcMain.on("START_BACKGROUND_VIA_MAIN", (event, args) => {
   });
 
   hiddenWindow = new BrowserWindow({
-    show: false,
+    show: true,
     webPreferences: {
       nodeIntegration: true
     }
