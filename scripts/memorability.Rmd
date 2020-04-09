@@ -20,11 +20,13 @@ library(lme4); library(lmerTest); library(tidyverse); library(data.table); libra
 
 getwd() # your current directory
 
-data_dir = "C:/Users/hanna/Documents/2019-2020/ObjectProject/datafiles/" #path where data is stored; depending on where you're running the script, we will need to tweak this
+data_dir = "/Users/sarahberger/Desktop/ObjectProject/datafiles/" #path where data is stored; depending on where you're running the script, we will need to tweak this
+#data_dir = "C:/Users/hanna/Documents/2019-2020/ObjectProject/datafiles/"
 
 # load("C:/Users/hanna/Documents/2019-2020/ObjectProject/data_cleaned.RData")
 # load("C:/Users/hanna/Documents/2019-2020/ObjectProject/objproj_simulations.RData")
-load("C:/Users/hanna/Documents/2019-2020/ObjectProject/simulations.RData")
+# load("C:/Users/hanna/Documents/2019-2020/ObjectProject/simulations.RData")
+load("/Users/sarahberger/Desktop/ObjectProject/simulations.RData")
 
 ```
 
@@ -209,7 +211,7 @@ hist(stats_by_participant$dprime, breaks = 50)
 
 # use the "modes" package to find the antimode (valley in between 2 distributions)
 cutoff_dprime = amps(stats_by_participant$dprime)$Antimode[2]
-print(cutoff_dprime) # 0.8170694
+print(cutoff_dprime) # 0.82541
 
 # look at the data above cutoff
 hist(stats_by_participant[dprime > cutoff_dprime]$dprime)
@@ -352,32 +354,32 @@ split_sample_by_stimulus <- function(DT, num_sims=10, stat="memory_hits"){
 
 ```{r Split samples for hit rate by stimulus}
 
-SS_hits_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "memory_hits") # 0.2980251
+SS_hits_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "memory_hits") # 0.3018771
 
 ```
 
 ```{r Split samples for false alarm by stimulus}
 
-SS_fa_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "memory_fa") # 0.3398046
+SS_fa_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "memory_fa") # 0.346721
 
 ```
 
 ```{r Split samples for dprime by stimulus}
 
-SS_dprime_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "dprime") # 0.3196747
+SS_dprime_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "dprime") #  0.3250509
 
 ```
 
 ```{r Split samples for rt by stimulus}
 
-SS_rt_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "rt") # 0.171698
+SS_rt_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "rt") #0.2171866
 
 ```
 
 
 ```{r Split samples for IES by stimulus}
 
-SS_IES_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "IES") # 0.2867079
+SS_IES_by_stimulus = split_sample_by_stimulus(data, num_sims = 1000, stat = "IES") # 0.2974514
 
 ```
 
@@ -403,14 +405,14 @@ view(calc_stats(data_corrected))
 calculate corrected hits by stimulus - corrected for participant average memorability
 ```{r Split samples corrected hits by stimulus}
 
-SS_corrected_hits_by_stimulus = split_sample_by_stimulus(data_corrected, num_sims = 100, stat = "memory_hits") # 0.3157219
+SS_corrected_hits_by_stimulus = split_sample_by_stimulus(data_corrected, num_sims = 100, stat = "memory_hits") #0.320663
 
 ```
 
 ```{r Split samples using corrected hits for IES by stimulus}
 
 # this gives us a weird answer because memory_hits is really low (e^-3 vs e^-1 is very different)
-SS_corrected_IES_by_stimulus = split_sample_by_stimulus(data_corrected, num_sims = 10, stat = "IES")
+SS_corrected_IES_by_stimulus = split_sample_by_stimulus(data_corrected, num_sims = 10, stat = "IES") #-2.44774e-05
 
 ```
 
@@ -445,7 +447,7 @@ data_RTZ$latency = data_RTZ$RTZ
 
 ```{r split sample simulation of IES with z-scored IES, normal hit rate}
 
-SS_IES_RTZ_by_stimulus = split_sample_by_stimulus(data_RTZ, num_sims = 1000, stat = "IES") # 0.2819942
+SS_IES_RTZ_by_stimulus = split_sample_by_stimulus(data_RTZ, num_sims = 1000, stat = "IES") #0.3261988
 
 ```
 
@@ -470,7 +472,7 @@ data_corrhits_RTZ$latency = data_corrhits_RTZ$RTZ
 
 ```{r split sample simulation of IES with z-scored latency and corrected hit rate}
 
-SS_IES_corrhits_RTZ_by_stimulus = split_sample_by_stimulus(data_corrhits_RTZ, num_sims = 1000, stat = "IES") # 0.2829528
+SS_IES_corrhits_RTZ_by_stimulus = split_sample_by_stimulus(data_corrhits_RTZ, num_sims = 1000, stat = "IES") # 0.3252525
 
 # This is still abnormally low; again, it's because we're dividing/multiplying by very small numbers that can be positive or negative (values can be very highly positive or negative)
 
@@ -497,10 +499,14 @@ rmsubforsim <- function(tbl){
   
   wide_summary = dcast(summarized_tbl, value.var="num_trials", participant~trialcode, fill=0)
 
-  cleaned_tbl = tbl[!participant %in% wide_summary[old_objects==0,]$participant]
+  cleaned_tbl = tbl[!participant %in% wide_summary[old_objects<10,]$participant]
   
   return(cleaned_tbl)
 }
+
+
+test_data_unclean = rmsubforsim(data_unclean)
+
 
 data_unclean_sim = rmsubforsim(data_unclean)
 data_clean_sim = rmsubforsim(data_clean)
@@ -621,10 +627,11 @@ plt_clean_extra = drawsimplot(sim_clean_extra)
 avgsub_clean_extra = mean(data_clean_sim[batch==5 & condition=="outdoor",
                                           .(avgsub = length(unique(participant))),
                                           by=.(stimulus)]$avgsub)
-plt_clean_extra+
-  labs(title = "Cleaned dataset, extra batch only",
-       subtitle = paste("sub per stim =", avgsub_clean_extra)) +
-  geom_vline(xintercept = avgsub_clean_extra, col = "red") + xlim=c(0, 40)
+plt_clean_extra +
+  labs(title = "Cleaned dataset, extra batch only") +
+  #labs(subtitle = paste("sub per stim =", avgsub_clean_extra)) +
+  geom_vline(xintercept = avgsub_clean_extra, col = "red") + 
+  xlim=c(0, 40)
 
 plt_clean_extra
 
@@ -664,7 +671,7 @@ pred_lowdprime <- function(tbl, min, max){
   tbl = tbl[trialcode == "old_objects",]
   
   low_tbl = tbl[dprime %between% c(min, max),]
-  pred_tbl = tbl[dprime %between% c(min, max), .(HR=mean(correct)), by=stimulus]
+  pred_tbl = tbl[dprime > cutoff_dprime, .(HR=mean(correct)), by=stimulus]
   pred_tbl[HR == 1, HR := 1 - (1/175)] # correct the hit rate
   pred_tbl[HR == 0, HR := 1/175]
   
@@ -708,7 +715,7 @@ dprime_04_06 %>%
   ggplot(aes(dprime, pred)) +
   geom_point() +
   geom_smooth(method = "auto") +
-  ylim(-15, 15)
+  ylim(-100, 100)
 
 dprime_02_08 = pred_lowdprime(data_unclean, min=0.2, max=0.8)
 
@@ -727,7 +734,7 @@ dprime_all %>%
   geom_smooth(method = "auto") +
   ylim(-15, 15)
 
-mean(dprime_all[pred %between% c(-100, 100) & dprime < 0.8,]$pred)
+mean(dprime_all[pred %between% c(-100, 100) & dprime < 0.8,]$pred) #4.49396
 
 dprime_00_06 = pred_lowdprime(data_unclean, min=0, max=0.6)
 
@@ -745,11 +752,11 @@ dprime_00_08 %>%
   geom_smooth(method = "auto") +
   ylim(-15, 15)
 
-mean(dprime_00_08[pred %between% c(-100, 100),]$pred)
+mean(dprime_00_08[pred %between% c(-100, 100),]$pred) #5.351742
 
 dprime_all_threshold = pred_lowdprime(data_unclean, min=0, max=5)
 
-mean(dprime_all_threshold[pred %between% c(-100, 100) & dprime < 0.8, ]$pred)
+mean(dprime_all_threshold[pred %between% c(-100, 100) & dprime < 0.8, ]$pred) #4.49396
 
 ```
 
@@ -767,6 +774,68 @@ double check why beta values are so different between sim + pred
 
 nameability
 -
+
+#orientation question sanity checks
+```{r orientation question sanity checks}
+
+mean(data_unclean[condition == "shoebox",]$dprime) #1.92092
+mean(data_unclean[condition == "manmade",]$dprime) #1.885797
+mean(data_unclean[condition == "outdoor",]$dprime) #1.89243
+mean(data_unclean[condition == "emotional",]$dprime) #2.129488
+
+HR_ratio <- function(tbl, criteria){
+  
+  tbl = tbl[trialcode == "old_objects",]
+  
+  low_tbl = tbl[dprime < criteria, .(low_N = .N, HR_low=mean(correct)), by=.(stimulus, condition)]
+  high_tbl = tbl[dprime > criteria, .(high_N = .N, HR_high=mean(correct)), by=.(stimulus, condition)]
+  summary_tbl = tbl[, .(HR_all=mean(correct)), by=.(stimulus, condition)]
+  
+  merge_tbl = merge(low_tbl, high_tbl, by=c("stimulus","condition"))
+  merge_tbl = merge(merge_tbl, summary_tbl, by=c("stimulus","condition"))
+  merge_tbl[, ratio := HR_low / HR_high]
+  
+}
+
+test = HR_ratio(test_data_unclean, .8)
+
+mean = test[is.finite(ratio)==TRUE, .(mean_ratio = mean(ratio, na.rm=TRUE), mean_low_N= mean(low_N), mean_high_N = mean(high_N)), by = "condition"]
+
+```
+
+
+```{r distribution of orientation question amongst poor dprime}
+
+low_dprime = data_unclean[dprime < cutoff_dprime]
+low_dprime[, length(unique(participant)), by = "condition"] #there are relatively few low dprime participants in manmade (even though it has similar total participants to the other 3 conditions)
+
+data_unclean[, length(unique(participant)), by = "condition"] 
+
+#create different memory scores per orientation question
+
+
+
+```
+
+
+#simulations by orientation question
+```{r simulations by orientation question}
+
+manmade_simulation = run_simulations(data_unclean_sim[condition == "manmade"], num_participants = 30, num_simulations = 30)
+outdoor_simulation = run_simulations(data_unclean_sim[condition == "outdoor"], num_participants = 30, num_simulations = 30)
+shoebox_simulation = run_simulations(data_unclean_sim[condition == "shoebox"], num_participants = 30, num_simulations = 30)
+emotional_simulation = run_simulations(data_unclean_sim[condition == "emotional"], num_participants = 30, num_simulations = 30)
+
+plt_manmade = drawsimplot(manmade_simulation) + labs(title = "manmade") +geom_hline(yintercept =1)
+plt_outdoor = drawsimplot(outdoor_simulation) + labs(title = "outdoor") +geom_hline(yintercept =1)
+plt_shoebox = drawsimplot(shoebox_simulation) + labs(title = "shoebox") +geom_hline(yintercept =1)
+plt_emotional = drawsimplot(emotional_simulation) + labs(title = "emotional") +geom_hline(yintercept =1)
+
+ggpubr::ggarrange(plt_manmade, plt_outdoor, plt_shoebox, plt_emotional,
+                  ncol=2, nrow=2)
+
+```
+
 
 
 # NOT CLEANED CODE AFTER THIS POINT
