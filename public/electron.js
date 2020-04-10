@@ -16,12 +16,12 @@ function createWindow() {
     : url.format({
         pathname: path.join(__dirname, "/../build/index.html"),
         protocol: "file:",
-        slashes: true
+        slashes: true,
       });
   mainWindow = new BrowserWindow({
     webPreferences: {
-      nodeIntegration: true
-    }
+      nodeIntegration: true,
+    },
   });
 
   mainWindow.loadURL(startUrl);
@@ -29,11 +29,11 @@ function createWindow() {
   BrowserWindow.addDevToolsExtension(
     path.join(
       os.homedir(),
-      ".config/google-chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.5.0_0"
+      ".config/google-chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.6.0_0"
     )
   );
 
-  mainWindow.on("closed", function() {
+  mainWindow.on("closed", function () {
     mainWindow = null;
   });
 }
@@ -68,14 +68,14 @@ ipcMain.on("START_BACKGROUND_VIA_MAIN", (event, args) => {
   const backgroundFileUrl = url.format({
     pathname: path.join(__dirname, `/../background_tasks/background.html`),
     protocol: "file:",
-    slashes: true
+    slashes: true,
   });
 
   hiddenWindow = new BrowserWindow({
     show: true,
     webPreferences: {
-      nodeIntegration: true
-    }
+      nodeIntegration: true,
+    },
   });
   hiddenWindow.loadURL(backgroundFileUrl);
 
@@ -90,7 +90,7 @@ ipcMain.on("START_BACKGROUND_VIA_MAIN", (event, args) => {
 // reply to background process when it's ready
 ipcMain.on("BACKGROUND_READY", (event, args) => {
   event.reply("START_PROCESSING", {
-    data: cache
+    data: cache,
   });
 });
 
