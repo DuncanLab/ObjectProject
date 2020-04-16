@@ -254,7 +254,7 @@ hits_by_stimulus[memory_hits == 0, memory_hits := 1/(2*(number_hits))]
 hits_by_stimulus[memory_hits == 1, memory_hits := 1 - (1/(2*number_hits))]
 
 # calculate fa and adjust value if 1 or 0
-false_alarms_by_stimulus = recognition_by_stimulus[trialcode == "old_objects",
+false_alarms_by_stimulus = recognition_by_stimulus[trialcode == "new_objects",
                                       .(memory_fa = (1-mean(correct)), number_fa = .N), by = stimulus]
 false_alarms_by_stimulus[memory_fa == 0, memory_fa := 1/(2*(number_fa))]
 false_alarms_by_stimulus[memory_fa == 1, memory_fa := 1 - (1/(2*number_fa))]
@@ -290,14 +290,14 @@ calc_stats <- function(DT){
   # find hit rate by stim, adjust value if 1 or 0
   hits_by_stimulus = DT[trialcode == "old_objects",
                         .(memory_hits = mean(correct), number_hits = .N), by = stimulus]
-  hits_by_stimulus[memory_hits == 1, memory_hits := (1 - 1/(2*number_hits))]
+  hits_by_stimulus[memory_hits == 1, memory_hits := (1 - (1/(2*number_hits)))]
   hits_by_stimulus[memory_hits == 0, memory_hits := 1/(2*number_hits)]
   
   # calculate false alarm rate, adjust value if 1 or 0
   fa_by_stimulus = DT[trialcode == "new_objects", 
                       .(memory_fa = (1-mean(correct)), number_fa = .N), by = stimulus]
   fa_by_stimulus[memory_fa == 0, memory_fa := (1/(2*number_fa))]
-  fa_by_stimulus[memory_fa == 1, memory_fa := (1-1/(2*(number_fa)))] # corrected fa if equal to 0 or 1
+  fa_by_stimulus[memory_fa == 1, memory_fa := (1 - (1/(2*number_fa)))] # corrected fa if equal to 0 or 1
   
   # calculate dprime
   dprime_by_stimulus = left_join(hits_by_stimulus, fa_by_stimulus) # putting hit rate and fa rate together
@@ -499,7 +499,7 @@ rmsubforsim <- function(tbl){
   
   wide_summary = dcast(summarized_tbl, value.var="num_trials", participant~trialcode, fill=0)
 
-  cleaned_tbl = tbl[!participant %in% wide_summary[old_objects<10,]$participant]
+  cleaned_tbl = tbl[!participant %in% wide_summary[old_objects<120,]$participant]
   
   return(cleaned_tbl)
 }
@@ -662,8 +662,8 @@ Note:
 
 # this function assumes that the dprime by participant is stored in the dataframe
 tbl = copy(data_unclean)
-min = 0.2
-max = 0.4
+min = -10
+max = 5
 i = 36
 
 pred_lowdprime <- function(tbl, min, max){
@@ -671,7 +671,7 @@ pred_lowdprime <- function(tbl, min, max){
   tbl = tbl[trialcode == "old_objects",]
   
   low_tbl = tbl[dprime %between% c(min, max),]
-  pred_tbl = tbl[dprime > cutoff_dprime, .(HR=mean(correct)), by=stimulus]
+  pred_tbl = tbl[, .(HR=mean(correct)), by=stimulus]
   pred_tbl[HR == 1, HR := 1 - (1/175)] # correct the hit rate
   pred_tbl[HR == 0, HR := 1/175]
   
@@ -697,14 +697,15 @@ pred_lowdprime <- function(tbl, min, max){
 
 ```{r Run it on participants dprime between 0.2-0.4}
 
-dprime_02_04 = pred_lowdprime(data_unclean, min=0.2, max=0.4)
+dprime_low = pred_lowdprime(data_unclean_sim, min=-10, max=10)
 
-dprime_02_04 %>%
-  ggplot(aes(dprime, pred)) +
+dprime_low %>%
+  ggplot(aes(HR_sub, pred)) +
   geom_point() +
   geom_smooth(method = "auto") +
   ylim(-15, 15)
 
+plot(dprime_low$dprime,dprime_low$HR_sub)
 ```
 
 ```{r Dprime between 0.4-0.6}
@@ -787,17 +788,22 @@ HR_ratio <- function(tbl, criteria){
   
   tbl = tbl[trialcode == "old_objects",]
   
-  low_tbl = tbl[dprime < criteria, .(low_N = .N, HR_low=mean(correct)), by=.(stimulus, condition)]
-  high_tbl = tbl[dprime > criteria, .(high_N = .N, HR_high=mean(correct)), by=.(stimulus, condition)]
-  summary_tbl = tbl[, .(HR_all=mean(correct)), by=.(stimulus, condition)]
+  low_tbl = tbl[dprime < criteria, .(low_N = .N, HR_low=mean(correct)), by=.(stimulus)]
+  high_tbl = tbl[dprime > criteria, .(high_N = .N, HR_high=mean(correct)), by=.(stimulus)]
+  summary_tbl = tbl[, .(HR_all=mean(correct)), by=.(stimulus)]
   
-  merge_tbl = merge(low_tbl, high_tbl, by=c("stimulus","condition"))
-  merge_tbl = merge(merge_tbl, summary_tbl, by=c("stimulus","condition"))
+  merge_tbl = merge(low_tbl, high_tbl, by=c("stimulus"))
+  merge_tbl = merge(merge_tbl, summary_tbl, by=c("stimulus"))
   merge_tbl[, ratio := HR_low / HR_high]
   
 }
 
-test = HR_ratio(test_data_unclean, .8)
+test = HR_ratio(data_unclean_sim, .8)
+
+test_subset = test[HR_all > 0.7]
+
+plot(test_subset$HR_high,test_subset$HR_low)
+cor(test_subset$HR_high,test_subset$HR_low)
 
 mean = test[is.finite(ratio)==TRUE, .(mean_ratio = mean(ratio, na.rm=TRUE), mean_low_N= mean(low_N), mean_high_N = mean(high_N)), by = "condition"]
 
@@ -836,6 +842,28 @@ ggpubr::ggarrange(plt_manmade, plt_outdoor, plt_shoebox, plt_emotional,
 
 ```
 
+
+# likelihood of a stimulus being remembered based on participant dprime
+```{r likelihood of a stimulus being remembered based on participant dprime}
+
+stimulus1= data_unclean_sim[, .(pred=0), by = stimulus]
+
+for (i in 1:nrow(stimulus1)) {
+  print(stimulus1[i,1])
+  data = data_unclean_sim[stimulus == stimulus1[[i,1]]]
+  model = glm(correct ~ dprime, family = binomial, data)
+
+  stimulus1[i,2]=model$coefficients[2]
+}
+return(stimulus1)
+
+ggplot(stimulus1, aes(stimulus,pred)) +
+  geom_point()+
+  geom_smooth()
+
+mean(stimulus1$pred)
+
+```
 
 
 # NOT CLEANED CODE AFTER THIS POINT
