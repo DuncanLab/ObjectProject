@@ -21,12 +21,12 @@ library(lme4); library(lmerTest); library(tidyverse); library(data.table); libra
 getwd() # your current directory
 
 data_dir = "/Users/sarahberger/Desktop/ObjectProject/datafiles/" #path where data is stored; depending on where you're running the script, we will need to tweak this
-#data_dir = "C:/Users/hanna/Documents/2019-2020/ObjectProject/datafiles/"
+data_dir = "C:/Users/hanna/Documents/2019-2020/ObjectProject/datafiles/"
 
 # load("C:/Users/hanna/Documents/2019-2020/ObjectProject/data_cleaned.RData")
 # load("C:/Users/hanna/Documents/2019-2020/ObjectProject/objproj_simulations.RData")
-# load("C:/Users/hanna/Documents/2019-2020/ObjectProject/simulations.RData")
-load("/Users/sarahberger/Desktop/ObjectProject/simulations.RData")
+load("C:/Users/hanna/Documents/2019-2020/ObjectProject/simulations.RData")
+# load("/Users/sarahberger/Desktop/ObjectProject/simulations.RData")
 
 ```
 
@@ -775,8 +775,9 @@ double check why beta values are so different between sim + pred
 
 nameability
 -
+# orientation question memorability
 
-#orientation question sanity checks
+## orientation question sanity checks
 ```{r orientation question sanity checks}
 
 mean(data_unclean[condition == "shoebox",]$dprime) #1.92092
@@ -824,7 +825,7 @@ data_unclean[, length(unique(participant)), by = "condition"]
 ```
 
 
-#simulations by orientation question
+##simulations by orientation question
 ```{r simulations by orientation question}
 
 manmade_simulation = run_simulations(data_unclean_sim[condition == "manmade"], num_participants = 30, num_simulations = 30)
@@ -843,7 +844,7 @@ ggpubr::ggarrange(plt_manmade, plt_outdoor, plt_shoebox, plt_emotional,
 ```
 
 
-# likelihood of a stimulus being remembered based on participant dprime
+## likelihood of a stimulus being remembered based on participant dprime
 ```{r likelihood of a stimulus being remembered based on participant dprime}
 
 stimulus1= data_unclean_sim[, .(pred=0), by = stimulus]
@@ -864,6 +865,106 @@ ggplot(stimulus1, aes(stimulus,pred)) +
 mean(stimulus1$pred)
 
 ```
+
+## split sample validation
+```{r}
+
+splitsampleorientation <- function(tbl, orientation, num_sim = 100, all=F){
+  
+  testsim = as.data.frame(matrix(data=NA, ncol=1, nrow=num_sim))
+  names(testsim) = c(orientation)
+  
+  if(all==F){tbl_condition = tbl[condition == orientation]}
+  else if(all==T){tbl_condition = copy(tbl)}
+  
+  for(i in 1:num_sim){
+    listsub = sample(unique(tbl_condition$participant))
+    half = as.integer(length(listsub) / 2)
+    
+    half1 = tbl_condition[participant %in% listsub[1:half],]
+    half2 = tbl_condition[participant %in% listsub[(half+1):length(listsub)],]
+    
+    summary1 = half1[, .(HR1 = mean(correct)), by=stimulus]
+    summary2 = half2[, .(HR2 = mean(correct)), by=stimulus]
+    
+    mergetbl = merge(summary1, summary2, by="stimulus")
+    model = lm(mergetbl$HR1, mergetbl$HR2)
+    
+    testsim[i, 1] = model$coefficients[2]
+  }
+  
+  return(testsim)
+}
+
+shoebox_split = splitsampleorientation(data_unclean, orientation="shoebox")
+emotional_split = splitsampleorientation(data_unclean, orientation= "emotional")
+manmade_split = splitsampleorientation(data_unclean, orientation="manmade")
+outdoor_split = splitsampleorientation(data_unclean, orientation="outdoor")
+
+all_split = splitsampleorientation(data_unclean, orientation= "all", all=T)
+
+split_tbl = cbind(shoebox_split, emotional_split, manmade_split, outdoor_split)
+split_tbl = cbind(split_tbl, all_split)
+
+boxplot(split_tbl)
+
+```
+
+```{r leave one out method for orientation q}
+
+bootstrapping_orientation <- function(tbl, orientation, num_sim = 100, all=F){
+  
+  testsim = as.data.frame(matrix(data=NA, ncol=1, nrow=num_sim))
+  names(testsim) = c(orientation)
+  
+  if(all==F){tbl_condition = tbl[condition == orientation]}
+  else if(all==T){tbl_condition = copy(tbl)}
+  
+  for(i in 1:num_sim){
+    listsub = sample(unique(tbl_condition$participant))
+    
+    oneout = tbl_condition[participant == listsub[1],]
+    everyone_else = tbl_condition[participant != listsub[1],][stimulus %in% oneout$stimulus]
+    
+    predsub = everyone_else[, .(HRpred = mean(correct)), by=stimulus]
+
+    mergetbl = merge(oneout, predsub, by="stimulus")
+    model = glm(correct ~ HRpred, family = "binomial", data=mergetbl)
+    
+    testsim[i, 1] = model$coefficients[2]
+  }
+  
+  return(testsim)
+}
+
+shoebox_boot = bootstrapping_orientation(data_unclean, orientation="shoebox")
+emotional_boot = bootstrapping_orientation(data_unclean, orientation= "emotional")
+manmade_boot = bootstrapping_orientation(data_unclean, orientation="manmade")
+outdoor_boot = bootstrapping_orientation(data_unclean, orientation="outdoor")
+
+all_boot = bootstrapping_orientation(data_unclean, orientation= "all", all=T)
+
+boot_tbl = cbind(shoebox_boot, emotional_boot, manmade_boot, outdoor_boot)
+boot_tbl = cbind(boot_tbl, all_boot)
+
+gathered_boot = gather(boot_tbl)
+
+ggplot(gathered_boot, aes(x=key, y=value)) +
+  geom_point(position="jitter", aes(colour=key)) +
+  stat_summary(fun.y = mean, geom = "point", size=3, color = "black") +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0, size = 1.5, color = "black") +
+  ylim(-20,20) +
+  geom_line(aes(x=key, y=mean(value), colour=key)) +
+  geom_hline(yintercept = mean(all_boot$all))
+
+
+mean(shoebox_boot$shoebox)
+mean(all_boot$all)
+
+```
+
+
+
 
 
 # NOT CLEANED CODE AFTER THIS POINT
@@ -1107,7 +1208,6 @@ hits_by_condition %>%
   facet_grid(condition ~ .) 
 
 ```
-
 
 
 
