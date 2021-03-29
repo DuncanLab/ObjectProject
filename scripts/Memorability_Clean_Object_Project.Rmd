@@ -464,7 +464,7 @@ list[1,2]
 
 noreplace_sim = run_simulations_noreplace(data_unclean[!stimulus %in% c("Dress_Blue.jpg","Airplane_Commercial.jpg","Foam_Acoustic.jpg","Flower_Sun.jpg","Oven.jpg", "Cookie.jpg")], num_participants = 23, num_simulations = 50)
 
-noreplace_sim_plot = drawsimplot(noreplace_sim) #sampling with replacement does not influence out beta values!
+noreplace_sim_plot = drawsimplot(noreplace_sim) #sampling with replacement does not influence our beta values!
 ```
 
 
