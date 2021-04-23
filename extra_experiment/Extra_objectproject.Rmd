@@ -521,3 +521,150 @@ dprime_effect_size_software_50stim <-ef
 
 ```
 
+# Create table for drop off in effect size gain as #stimuli per condition increases
+
+```{r create table}
+
+plot_ef <- data.frame(matrix(ncol = 3, nrow = 20))
+colnames(plot_ef) <- c("stimpergroup","mean","group")
+plot_ef$stimpergroup <- rep(seq(5,50,5), each=2)
+plot_ef$group <- rep(c("Random","Software"))
+
+random_ef_fun<- function(n){
+
+effect_sizes <- c()
+
+for (i in 1:1000) {
+  sample_1 = sample_n(list_1, n)
+  sample_2 = sample_n(list_2, n)
+  sample_3 = sample_n(list_3, n)
+  sample_4 = sample_n(list_4, n)
+  sample_5 = sample_n(list_5, n)
+  sample_6 = sample_n(list_6, n)
+  sample_7 = sample_n(list_7, n)
+  sample_8 = sample_n(list_8, n)
+  
+  
+  snippet = random[
+  (batch %in% c(1,2) & stimulus %in% sample_1$V1 | stimulus %in% sample_2$V1) | 
+    (batch %in% c(3,4) & stimulus %in% sample_3$V1 | stimulus %in% sample_4$V1) |
+    (batch %in% c(5,6) & stimulus %in% sample_5$V1 | stimulus %in% sample_6$V1) |
+    (batch %in% c(7,8) & stimulus %in% sample_7$V1 | stimulus %in% sample_8$V1)]
+  
+  
+  meansnippet = snippet[, .(mean =mean(correct)), by = .(participant, old_object_condition)]
+  
+  goodparticipants = meansnippet[, .N, by=participant]
+  goodparticipants = goodparticipants[goodparticipants$N == 3,]$participant #if they don't have a value for all three conditions, a paired samples effect size wont work
+  meansnippet = meansnippet[meansnippet$participant %in% goodparticipants,]
+  
+  ef = cohen.d(meansnippet[old_object_condition == 3]$mean, meansnippet[old_object_condition == 1]$mean, paired = T)
+  effect_sizes <- c(effect_sizes, ef$estimate)
+}
+
+return(effect_sizes)
+}
+
+# fill data table with results from the function
+
+rand_5 = random_ef_fun(5)
+plot_ef[1,2] <- mean(rand_5)
+
+rand_10 = random_ef_fun(10)
+plot_ef[3,2] <- mean(rand_10)
+
+rand_15 = random_ef_fun(15)
+plot_ef[5,2] <- mean(rand_15)
+
+rand_20 = random_ef_fun(20)
+plot_ef[7,2] <- mean(rand_20)
+
+rand_25 = random_ef_fun(25)
+plot_ef[9,2] <- mean(rand_25)
+
+rand_30 = random_ef_fun(30)
+plot_ef[11,2] <- mean(rand_30)
+
+rand_35 = random_ef_fun(35)
+plot_ef[13,2] <- mean(rand_35)
+
+rand_40 = random_ef_fun(40)
+plot_ef[15,2] <- mean(rand_40)
+
+rand_45 = random_ef_fun(45)
+plot_ef[17,2] <- mean(rand_45)
+
+rand_50 = random_ef_fun(50)
+plot_ef[19,2] <- mean(rand_50)
+
+
+### software
+software_ef_fun <- function(n){
+effect_sizes <- c()
+
+  sample_9 = list_9[1:n,]
+  sample_10 = list_10[1:n,]
+  sample_11 = list_11[1:n,]
+  sample_12 = list_12[1:n,]
+  sample_13 = list_13[1:n,]
+  sample_14 = list_14[1:n,]
+  sample_15 = list_15[1:n,]
+  sample_16 = list_16[1:n,]
+  
+  
+  snippet = software[
+  (batch %in% c(9,10) & stimulus %in% sample_9 | stimulus %in% sample_10) | 
+    (batch %in% c(11,12) & stimulus %in% sample_11 | stimulus %in% sample_12) |
+    (batch %in% c(13,14) & stimulus %in% sample_13 | stimulus %in% sample_14) |
+    (batch %in% c(15,16) & stimulus %in% sample_15 | stimulus %in% sample_16)]
+  
+  meansnippet = snippet[, .(mean =mean(correct)), by = .(participant, old_object_condition)]
+
+  ef = cohen.d(meansnippet[old_object_condition == 3]$mean, meansnippet[old_object_condition == 1]$mean, paired = T)
+  
+  effect_size = ef$estimate
+  
+  return(effect_size)
+}
+
+soft_5 = software_ef_fun(5)
+plot_ef[2,2] <- mean(soft_5)
+
+soft_10 = software_ef_fun(10)
+plot_ef[4,2] <- mean(soft_10)
+
+soft_15 = software_ef_fun(15)
+plot_ef[6,2] <- mean(soft_15)
+
+soft_20 = software_ef_fun(20)
+plot_ef[8,2] <- mean(soft_20)
+
+soft_25 = software_ef_fun(25)
+plot_ef[10,2] <- mean(soft_25)
+
+soft_30 = software_ef_fun(30)
+plot_ef[12,2] <- mean(soft_30)
+
+soft_35 = software_ef_fun(35)
+plot_ef[14,2] <- mean(soft_35)
+
+soft_40 = software_ef_fun(40)
+plot_ef[16,2] <- mean(soft_40)
+
+soft_45 = software_ef_fun(45)
+plot_ef[18,2] <- mean(soft_45)
+
+soft_50 = software_ef_fun(50)
+plot_ef[20,2] <- mean(soft_50)
+
+```
+
+```{r plot effect sizes}
+
+ef_graph <- ggplot(plot_ef, aes(x = stimpergroup, y = mean, color = group)) +
+  geom_line() +
+  ylab("effect size")
+
+ggsave(ef_graph, file = "effectsizes.png")
+```
+
