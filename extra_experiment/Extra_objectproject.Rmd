@@ -12,7 +12,7 @@ editor_options:
 ```{r load packages}
 
 rm(list = ls()) #run this line to clear your environment
-library(lme4); library(lmerTest); library(tidyverse); library(data.table); library(dtplyr); library(effsize); library(pwr)
+library(lme4); library(lmerTest); library(tidyverse); library(data.table); library(dtplyr); library(effsize); library(pwr); 
 
 data_dir = "~/Desktop/ObjectProject/extra experiment/data/"
 
@@ -525,9 +525,9 @@ dprime_effect_size_software_50stim <-ef
 
 ```{r create table}
 
-plot_ef <- data.frame(matrix(ncol = 3, nrow = 20))
-colnames(plot_ef) <- c("stimpergroup","mean","group")
-plot_ef$stimpergroup <- rep(seq(5,50,5), each=2)
+plot_ef <- data.frame(matrix(ncol = 5, nrow = 32))
+colnames(plot_ef) <- c("stimpergroup","mean","group","CI_upper","CI_lower")
+plot_ef$stimpergroup <- rep(seq(5,80,5), each=2)
 plot_ef$group <- rep(c("Random","Software"))
 
 random_ef_fun<- function(n){
@@ -568,35 +568,100 @@ return(effect_sizes)
 # fill data table with results from the function
 
 rand_5 = random_ef_fun(5)
-plot_ef[1,2] <- mean(rand_5)
+sum_rand5 <- CI(rand_5)
+plot_ef[1,2] <- sum_rand5[2]
+plot_ef[1,4] <- sum_rand5[1]
+plot_ef[1,5] <- sum_rand5[3]
 
 rand_10 = random_ef_fun(10)
-plot_ef[3,2] <- mean(rand_10)
+sum_rand10 <- CI(rand_10)
+plot_ef[3,2] <- sum_rand10[2]
+plot_ef[3,4] <- sum_rand10[1]
+plot_ef[3,5] <- sum_rand10[3]
 
 rand_15 = random_ef_fun(15)
-plot_ef[5,2] <- mean(rand_15)
+sum_rand15 <- CI(rand_15)
+plot_ef[5,2] <- sum_rand15[2]
+plot_ef[5,4] <- sum_rand15[1]
+plot_ef[5,5] <- sum_rand15[3]
 
 rand_20 = random_ef_fun(20)
-plot_ef[7,2] <- mean(rand_20)
+sum_rand20 <- CI(rand_20)
+plot_ef[7,2] <- sum_rand20[2]
+plot_ef[7,4] <- sum_rand20[1]
+plot_ef[7,5] <- sum_rand20[3]
 
 rand_25 = random_ef_fun(25)
-plot_ef[9,2] <- mean(rand_25)
+sum_rand25 <- CI(rand_25)
+plot_ef[9,2] <- sum_rand25[2]
+plot_ef[9,4] <- sum_rand25[1]
+plot_ef[9,5] <- sum_rand25[3]
 
 rand_30 = random_ef_fun(30)
-plot_ef[11,2] <- mean(rand_30)
+sum_rand30 <- CI(rand_30)
+plot_ef[11,2] <- sum_rand30[2]
+plot_ef[11,4] <- sum_rand30[1]
+plot_ef[11,5] <- sum_rand30[3]
 
 rand_35 = random_ef_fun(35)
-plot_ef[13,2] <- mean(rand_35)
+sum_rand35 <- CI(rand_35)
+plot_ef[13,2] <- sum_rand35[2]
+plot_ef[13,4] <- sum_rand35[1]
+plot_ef[13,5] <- sum_rand35[3]
 
 rand_40 = random_ef_fun(40)
-plot_ef[15,2] <- mean(rand_40)
+sum_rand40 <- CI(rand_40)
+plot_ef[15,2] <- sum_rand40[2]
+plot_ef[15,4] <- sum_rand40[1]
+plot_ef[15,5] <- sum_rand40[3]
 
 rand_45 = random_ef_fun(45)
-plot_ef[17,2] <- mean(rand_45)
+sum_rand45 <- CI(rand_45)
+plot_ef[17,2] <- sum_rand45[2]
+plot_ef[17,4] <- sum_rand45[1]
+plot_ef[17,5] <- sum_rand45[3]
 
 rand_50 = random_ef_fun(50)
-plot_ef[19,2] <- mean(rand_50)
+sum_rand50 <- CI(rand_50)
+plot_ef[19,2] <- sum_rand50[2]
+plot_ef[19,4] <- sum_rand50[1]
+plot_ef[19,5] <- sum_rand50[3]
 
+rand_55 = random_ef_fun(55)
+sum_rand55 <- CI(rand_55)
+plot_ef[21,2] <- sum_rand55[2]
+plot_ef[21,4] <- sum_rand55[1]
+plot_ef[21,5] <- sum_rand55[3]
+
+rand_60 = random_ef_fun(60)
+sum_rand60 <- CI(rand_60)
+plot_ef[23,2] <- sum_rand60[2]
+plot_ef[23,4] <- sum_rand60[1]
+plot_ef[23,5] <- sum_rand60[3]
+
+rand_65 = random_ef_fun(65)
+sum_rand65 <- CI(rand_65)
+plot_ef[25,2] <- sum_rand65[2]
+plot_ef[25,4] <- sum_rand65[1]
+plot_ef[25,5] <- sum_rand65[3]
+
+rand_70 = random_ef_fun(70)
+sum_rand70 <- CI(rand_70)
+plot_ef[27,2] <- sum_rand70[2]
+plot_ef[27,4] <- sum_rand70[1]
+plot_ef[27,5] <- sum_rand70[3]
+
+rand_75 = random_ef_fun(75)
+sum_rand75 <- CI(rand_75)
+plot_ef[29,2] <- sum_rand75[2]
+plot_ef[29,4] <- sum_rand75[1]
+plot_ef[29,5] <- sum_rand75[3]
+
+rand_80 = random_ef_fun(80)
+sum_rand80 <- CI(rand_80)
+plot_ef[31,2] <- sum_rand80[2]
+plot_ef[31,4] <- sum_rand80[1]
+plot_ef[31,5] <- sum_rand80[3]
 
 ### software
 software_ef_fun <- function(n){
@@ -657,13 +722,32 @@ plot_ef[18,2] <- mean(soft_45)
 soft_50 = software_ef_fun(50)
 plot_ef[20,2] <- mean(soft_50)
 
+soft_55 = software_ef_fun(55)
+plot_ef[22,2] <- mean(soft_55)
+
+soft_60 = software_ef_fun(60)
+plot_ef[24,2] <- mean(soft_60)
+
+soft_65 = software_ef_fun(65)
+plot_ef[26,2] <- mean(soft_65)
+
+soft_70 = software_ef_fun(70)
+plot_ef[28,2] <- mean(soft_70)
+
+soft_75= software_ef_fun(75)
+plot_ef[30,2] <- mean(soft_75)
+
+soft_80= software_ef_fun(80)
+plot_ef[32,2] <- mean(soft_80)
+
 ```
 
 ```{r plot effect sizes}
 
 ef_graph <- ggplot(plot_ef, aes(x = stimpergroup, y = mean, color = group)) +
   geom_line() +
-  ylab("effect size")
+  ylab("effect size") +
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7)
 
 ggsave(ef_graph, file = "effectsizes.png")
 ```
