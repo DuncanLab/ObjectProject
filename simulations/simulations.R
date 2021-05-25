@@ -1,5 +1,5 @@
 #load data
-library(tidyverse); library(data.table); library(dtplyr); library(effsize)
+library(tidyverse); library(data.table); library(dtplyr); library(effsize); library(ggplot2)
 
 setwd("~/Desktop/ObjectProject")
 data = setDT(read.csv("data.csv"))
@@ -18,7 +18,7 @@ HR_sub = setDT(HR_sub)
 #create a vector with each individual stimulus and their hit rate
 HR_stim = data[, .(HR = mean(correct)), by = stimulus]
 
-stimpergroup = seq(1,21,5)
+stimpergroup = seq(1,51,5)
 
 
 ####### with stimulus variability ######
@@ -110,7 +110,7 @@ sim_SPC_iter <- function (n_iter = 5) { #input how many iterations to run
   return(eflist)
 }
 
-w_stim_var = sim_SPC_iter(n_iter = 15)
+w_stim_var = sim_SPC_iter(n_iter = 100)
 
 ef1 = setDT(w_stim_var[[1]])
 ef2 = setDT(w_stim_var[[2]])
@@ -123,7 +123,7 @@ to_join_2 = ef2[, .(cond2_mean = mean(correct)), by = .(iteration, subject, stim
 
 stimvartable = left_join(to_join_1,to_join_2)
 
-cohensdtestrun = as.data.frame(matrix(ncol=5))
+cohensdtestrun = as.data.frame(matrix(ncol=11))
 colnames(cohensdtestrun) <- c(stimpergroup)
 
 cohensdtestrun[,1]= cohen.d(stimvartable[stimpergroup == 1]$cond1_mean, stimvartable[stimpergroup == 1]$cond2_mean, paired = T, na.rm = T)$estimate
@@ -131,6 +131,13 @@ cohensdtestrun[,2]= cohen.d(stimvartable[stimpergroup == 6]$cond1_mean, stimvart
 cohensdtestrun[,3]= cohen.d(stimvartable[stimpergroup == 11]$cond1_mean, stimvartable[stimpergroup == 11]$cond2_mean, paired = T, na.rm = T)$estimate
 cohensdtestrun[,4]= cohen.d(stimvartable[stimpergroup == 16]$cond1_mean, stimvartable[stimpergroup == 16]$cond2_mean, paired = T, na.rm = T)$estimate
 cohensdtestrun[,5]= cohen.d(stimvartable[stimpergroup == 21]$cond1_mean, stimvartable[stimpergroup == 21]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun[,6]= cohen.d(stimvartable[stimpergroup == 26]$cond1_mean, stimvartable[stimpergroup == 26]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun[,7]= cohen.d(stimvartable[stimpergroup == 31]$cond1_mean, stimvartable[stimpergroup == 31]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun[,8]= cohen.d(stimvartable[stimpergroup == 36]$cond1_mean, stimvartable[stimpergroup == 36]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun[,9]= cohen.d(stimvartable[stimpergroup == 41]$cond1_mean, stimvartable[stimpergroup == 41]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun[,10]= cohen.d(stimvartable[stimpergroup == 46]$cond1_mean, stimvartable[stimpergroup == 46]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun[,11]= cohen.d(stimvartable[stimpergroup == 51]$cond1_mean, stimvartable[stimpergroup == 51]$cond2_mean, paired = T, na.rm = T)$estimate
+
 
 cohensdtestrun
 
@@ -209,7 +216,7 @@ sim_SPC_iter_nostimvar <- function (n_iter = 15) { #input how many interations t
   return(eflist)
 }
 
-without_stim_var = sim_SPC_iter_nostimvar(n_iter = 15)
+without_stim_var = sim_SPC_iter_nostimvar(n_iter = 100)
 
 ef_1_nsv = setDT(without_stim_var[[1]])
 ef_2_nsv = setDT(without_stim_var[[2]])
@@ -222,7 +229,7 @@ to_join_2_nsv = ef_2_nsv[, .(cond2_mean = mean(correct)), by = .(iteration, subj
 
 nostimvartable = left_join(to_join_1_nsv,to_join_2_nsv)
 
-cohensdtestrun3 = as.data.frame(matrix(ncol=5))
+cohensdtestrun3 = as.data.frame(matrix(ncol=11))
 colnames(cohensdtestrun3) <- c(stimpergroup)
 
 cohensdtestrun3[,1]= cohen.d(nostimvartable[stimpergroup == 1]$cond1_mean, nostimvartable[stimpergroup == 1]$cond2_mean, paired = T, na.rm = T)$estimate
@@ -230,6 +237,12 @@ cohensdtestrun3[,2]= cohen.d(nostimvartable[stimpergroup == 6]$cond1_mean, nosti
 cohensdtestrun3[,3]= cohen.d(nostimvartable[stimpergroup == 11]$cond1_mean, nostimvartable[stimpergroup == 11]$cond2_mean, paired = T, na.rm = T)$estimate
 cohensdtestrun3[,4]= cohen.d(nostimvartable[stimpergroup == 16]$cond1_mean, nostimvartable[stimpergroup == 16]$cond2_mean, paired = T, na.rm = T)$estimate
 cohensdtestrun3[,5]= cohen.d(nostimvartable[stimpergroup == 21]$cond1_mean, nostimvartable[stimpergroup == 21]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun3[,6]= cohen.d(nostimvartable[stimpergroup == 26]$cond1_mean, nostimvartable[stimpergroup == 26]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun3[,7]= cohen.d(nostimvartable[stimpergroup == 31]$cond1_mean, nostimvartable[stimpergroup == 31]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun3[,8]= cohen.d(nostimvartable[stimpergroup == 36]$cond1_mean, nostimvartable[stimpergroup == 36]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun3[,9]= cohen.d(nostimvartable[stimpergroup == 41]$cond1_mean, nostimvartable[stimpergroup == 41]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun3[,10]= cohen.d(nostimvartable[stimpergroup == 46]$cond1_mean, nostimvartable[stimpergroup == 46]$cond2_mean, paired = T, na.rm = T)$estimate
+cohensdtestrun3[,11]= cohen.d(nostimvartable[stimpergroup == 51]$cond1_mean, nostimvartable[stimpergroup == 51]$cond2_mean, paired = T, na.rm = T)$estimate
 
 cohensdtestrun3
 
@@ -238,12 +251,12 @@ without_stimulus_variability = cohensdtestrun3
 ####### using the software to equate stimulus variability ######
 
 #create a vector with each individual subject and their hit rate
-HR_sub = data[, .(HR = mean(correct)), by = participant]
-HR_sub = sample_n(as.data.frame(HR_sub), 20, replace = TRUE)
+#HR_sub = data[, .(HR = mean(correct)), by = participant]
+#HR_sub = sample_n(as.data.frame(HR_sub), 20, replace = TRUE)
 
-HR_sub$HR_2 = (HR_sub$HR - rnorm(1, mean = .1, sd = .1)) #condition 2 is 1 sd lower than cond 1
-HR_sub = setDT(HR_sub)
-HR_sub$HR_2[HR_sub$HR_2<=0] <- 0.01
+#HR_sub$HR_2 = (HR_sub$HR - rnorm(1, mean = .1, sd = .1)) #condition 2 is 1 sd lower than cond 1
+#HR_sub = setDT(HR_sub)
+#HR_sub$HR_2[HR_sub$HR_2<=0] <- 0.01
 
 #create a vector with each individual stimulus and their hit rate
 HR_stimc = data_corrected[, .(HR_corrected = mean(correct)), by = stimulus]
@@ -834,7 +847,7 @@ cond2_51 = c("Kiwi.jpg",
 
 cond2_stim_list = list(cond2_1, cond2_6, cond2_11, cond2_16, cond2_21, cond2_26, cond2_31, cond2_36, cond2_41, cond2_46, cond2_51)
 
-stimpergroup = seq(1,51,5)
+#stimpergroup = seq(1,51,5)
 
 sim_software <- function (n_iter = 5) { #input how many iterations to run
   
@@ -927,7 +940,7 @@ sim_software <- function (n_iter = 5) { #input how many iterations to run
   return(eflist)
 }
 
-sim_software_run = sim_software(n_iter = 5)
+sim_software_run = sim_software(n_iter = 100)
 
 software_ef1 = setDT(sim_software_run[[1]])
 software_ef2 = setDT(sim_software_run[[2]])
@@ -1085,7 +1098,7 @@ sim_counterbalance <- function (n_iter = 15) { #input how many iterations to run
   return(eflist)
 }
 
-sim_random_counter = sim_counterbalance(n_iter = 5)
+sim_random_counter = sim_counterbalance(n_iter = 100)
 
 counter_ef1 = setDT(sim_random_counter[[1]])
 counter_ef2 = setDT(sim_random_counter[[2]])
@@ -1125,6 +1138,26 @@ cohen.d(softwaretable$cond1_mean, softwaretable$cond2_mean, paired = T, na.rm = 
 #virtually no difference
 
 
+#### create a table with all the simulations and their mean + sd
 
+long_sim1 <- pivot_longer(with_stimulus_variability, cols = 1:11, names_to = "stim_per_group", values_to = "Effect_Size")
+long_sim1$simulation <- "Random - with stimulus variability"
 
+long_sim2 <- pivot_longer(without_stimulus_variability, cols = 1:11, names_to = "stim_per_group", values_to = "Effect_Size")
+long_sim2$simulation <- "Random - without stimulus variability"
+
+long_sim3 <- pivot_longer(software, cols = 1:11, names_to = "stim_per_group", values_to = "Effect_Size")
+long_sim3$simulation <- "Software"
+
+long_sim4 <- pivot_longer(cohensdrandcounter, cols = 1:11, names_to = "stim_per_group", values_to = "Effect_Size")
+long_sim4$simulation <- "Random - with counterbalancing"
+
+sim_plot_dat <- rbind(long_sim1, long_sim2, long_sim3, long_sim4)
+
+sim_plot <- ggplot(sim_plot_dat, aes(x = as.numeric(stim_per_group), y = Effect_Size, color = simulation)) +
+  geom_line(aes(group = simulation), size = 2) +
+  xlab("Number of stimuli per group") +
+  ylab("Effect Size")
+
+ggsave(sim_plot, filename = "sim_plot.png", width = 10, height = 5)
 
