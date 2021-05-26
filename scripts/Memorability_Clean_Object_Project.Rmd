@@ -171,19 +171,44 @@ data_unclean = copy(data) # this is before we remove participants with low dprim
 ## 1.1: Look at bimodal distribution
 
 ```{r visualize bimodal distributions of dprime}
-# the dprime values look bimodal
-hist(data$dprime, breaks = 50)
 
 # use the "modes" package to find the antimode (valley in between 2 distributions)
-cutoff_dprime = amps(stats_by_participant$dprime)$Antimode[1] # 0.6652773
+modeinfo = amps(stats_by_participant$dprime)
 
-#visualize density plots
-mixmdl= normalmixEM(stats_by_participant$dprime)
-plot(mixmdl,which=2, breaks=30)
-lines(density(data$dprime), lty=2, lwd=2)
-mixmdl$lambda
-mixmdl$mu 
-mixmdl$sigma 
+cutoff_dprime = modeinfo$Antimode[2] # 0.6652773; now 0.8259749
+
+stats_rm = stats_by_participant[dprime > -1]
+
+#visualize density plots using mixtools
+
+# get best KDE for the distributions underlying the population
+mixmdl = normalmixEM(stats_by_participant$dprime, k=2)
+for(i in 1:100){
+  mdl = normalmixEM(stats_by_participant$dprime, k=2)
+  # loglik is negative; closer to 0 means better model fit
+  if(mdl$loglik > mixmdl$loglik){
+    mixmdl = mdl
+  }
+}
+
+plot(mixmdl, which=2, breaks=30,
+     main1=' ',
+     xlab2='dprime',
+     ylab2='Proportion of participants',)
+abline(v = cutoff_dprime, lwd=2)
+
+
+mixmdl$mu
+mixmdl$sigma
+
+# This does not work-- dnorm does not allow modification of AUC
+# ggplot(stats_by_participant, aes(x=dprime)) +
+#   # i just wanted the purple alex used why this :^)
+#   geom_histogram(binwidth=0.1, fill="#420dab", col="white") +
+#   geom_vline(xintercept=cutoff_dprime, colour = "black", size=1) +
+#   stat_function(fun=dnorm, 
+#                 args = c(mean=mixmdl$mu[1], sd=mixmdl$sigma)[1],) +
+#   stat_function(fun=dnorm, args = c(mean=mixmdl$mu[2], sd=mixmdl$sigma[2]))
 
 ```
 
@@ -1000,4 +1025,96 @@ memorability_dt[, scaled_memory_hits := percent_rank(memorability)]
 
 write_csv(memorability_dt, "memorability_dt.csv")
 ```
+
+
+# Analysis 6: Demographics information
+
+```{r Demographics for entire participant pool}
+
+demo_full = data_full[blockcode == 'demographics_block']
+demo_full = demo_full[trialcode != 'raceother'] # there were two, which interfered with pivot tables
+
+demo_full1 = demo_full %>%
+  group_by(participant, trialcode) %>%
+  select(participant, trialcode, response) %>%
+  pivot_wider(names_from = trialcode, values_from = response, values_fill = NA) %>%
+  mutate(gender = tolower(gender))
+
+# non-respondents, or unusual responses
+# View(demo_full1[!substr(demo_full1$gender, 1, 2) %in% c('fe','ma'),])
+# 10 did not respond
+# 3 participants flipped age-gender
+demo_full1[demo_full1$participant %in% c(115, 134, 321), c("gender","age")] = 
+  demo_full1[demo_full1$participant %in% c(115, 134, 321), c('age', 'gender')] 
+# 1 nonbinary
+# 2 binary but different spelling; resolved by taking first letter only + changing w to f
+# 1 keysmash (going to treat as a non-response)
+
+demo_full1[demo_full1$age == '',]$age = '0'
+
+demo_full2 = demo_full1 %>%
+  mutate(gender = substr(gender,1,1)) %>%
+  mutate(gender = case_when(gender == 'n' ~ 'n',
+                            gender %in% c('f','w') ~ 'f',
+                            gender == 'm' ~ 'm',
+                            !gender %in% c('f','m','w', 'n') ~ '.'),
+         age = as.numeric(as.character(age)))
+
+# number of participants
+nrow(demo_full2) # n=394
+
+# gender, in percentages
+table(demo_full2$gender)/(nrow(demo_full2))*100
+
+# age
+mean(demo_full2[demo_full2$age > 1,]$age)
+sd(demo_full2[demo_full2$age > 1,]$age)
+range(demo_full2[demo_full2$age > 1,]$age)
+hist(demo_full2[demo_full2$age > 1,]$age)
+
+```
+
+```{r Demographics for cleaned participant pool}
+
+demo = data_full[data_full$participant %in% data_clean$participant & blockcode == 'demographics_block']
+demo = demo[trialcode != 'raceother'] # there were two, which interfered with pivot tables
+
+demo1 = demo %>%
+  group_by(participant, trialcode) %>%
+  select(participant, trialcode, response) %>%
+  pivot_wider(names_from = trialcode, values_from = response, values_fill = NA) %>%
+  mutate(gender = tolower(gender))
+
+# 3 participants flipped age-gender
+demo1[demo1$participant %in% c(115, 134, 321), c("gender","age")] = 
+  demo1[demo1$participant %in% c(115, 134, 321), c('age', 'gender')] 
+# 1 nonbinary
+# 2 male/female but different spelling; resolved by taking first letter only + changing w to f
+# 1 keysmash (going to treat as a non-response)
+
+demo1[demo1$age == '',]$age = '0'
+
+demo2 = demo1 %>%
+  mutate(gender = tolower(substr(gender,1,1))) %>%
+  mutate(gender = case_when(gender == 'n' ~ 'n',
+                            gender %in% c('f','w') ~ 'f',
+                            gender == 'm' ~ 'm',
+                            !gender %in% c('f','m','w', 'n') ~ '.'),
+         age = as.numeric(as.character(age)))
+
+# number of participants
+nrow(demo2) # n=284
+
+# gender, in percentages
+table(demo2$gender)/(nrow(demo2))*100
+
+# age
+mean(demo2[demo2$age > 1,]$age, na.rm=T)
+sd(demo2[demo2$age > 1,]$age)
+range(demo2[demo2$age > 1,]$age)
+hist(demo2[demo2$age > 1,]$age)
+
+```
+
+
 

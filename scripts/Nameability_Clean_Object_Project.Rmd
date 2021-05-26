@@ -305,3 +305,94 @@ full_dt_pf = left_join(full_dt_pf, nameability_dt)
 write_csv(full_dt_pf, "full_dt_pf.csv")
 ```
 
+
+# Demographics information
+
+```{r}
+
+demo_full = data_full[blockcode == 'demographics_block']
+demo_full = demo_full[trialcode != 'raceother'] # there were two, which interfered with pivot tables
+demo_full$response = as.character(demo_full$response)
+
+demo_full1 = demo_full %>%
+  group_by(participant, trialcode, date) %>%
+  select(participant, trialcode, response) %>%
+  pivot_wider(names_from = trialcode, values_from = response, values_fill = NA) %>%
+  mutate(gender = as.character(gender),
+         age = as.numeric(age))
+
+# 2 people with overlapping participant ids (20, 21); seemed to have the same mturk id, so removed the second time (both did an experiment on date 52719, so removed that date)
+
+demo_full1 = demo_full1[!demo_full1$participant %in% c(20, 21) | !demo_full1$date == 52719,]
+
+# 1 person responded with 'b' to age/gender/education --> treat as non-response
+# 1 non-response
+
+demo1[demo1$age == '',]$age = '0'
+
+demo_full2 = demo_full1 %>%
+  mutate(gender = tolower(substr(gender,1,1))) %>%
+  mutate(gender = case_when(gender == 'n' ~ 'n',
+                            gender %in% c('f','w') ~ 'f',
+                            gender == 'm' ~ 'm',
+                            !gender %in% c('f','m','w', 'n') ~ '.'),
+         age = as.numeric(as.character(age)))
+
+# number of participants
+nrow(demo_full2) # n=251
+
+# gender, in percentages
+table(demo_full2$gender)/(nrow(demo_full2))*100
+
+# age (note that there is n=249 for age)
+mean(demo_full2$age, na.rm=T) # 38.3
+sd(demo_full2$age, na.rm=T) # 11.1
+range(demo_full2$age, na.rm=T) # 19-73
+hist(demo_full2$age)
+
+```
+
+
+```{r For cleaned data}
+
+demo = data_full[blockcode == 'demographics_block' & participant %in% data_clean$participant]
+demo = demo[trialcode != 'raceother'] # there were two, which interfered with pivot tables
+demo$response = as.character(demo$response)
+
+demo1 = demo %>%
+  group_by(participant, trialcode, date) %>%
+  select(participant, trialcode, response) %>%
+  pivot_wider(names_from = trialcode, values_from = response, values_fill = NA) %>%
+  mutate(gender = as.character(gender),
+         age = as.numeric(age))
+
+# 2 people with overlapping participant ids (20, 21); seemed to have the same mturk id, so removed the second time (both did an experiment on date 52719, so removed that date)
+demo1 = demo1[!demo1$participant %in% c(20, 21) | !demo1$date == 52719,]
+
+# 1 person responded with 'b' to age/gender/education --> treat as non-response
+# 1 non-response
+
+demo1[demo1$age == '',]$age = '0'
+
+demo2 = demo1 %>%
+  mutate(gender = tolower(substr(gender,1,1))) %>%
+  mutate(gender = case_when(gender == 'n' ~ 'n',
+                            gender %in% c('f','w') ~ 'f',
+                            gender == 'm' ~ 'm',
+                            !gender %in% c('f','m','w', 'n') ~ '.'),
+         age = as.numeric(as.character(age)))
+
+# number of participants
+nrow(demo2) # n=251
+
+# gender, in percentages
+table(demo2$gender)/(nrow(demo2))*100
+
+# age (note that there is n=249 for age)
+mean(demo2$age, na.rm=T) # 38.3
+sd(demo2$age, na.rm=T) # 11.1
+range(demo2$age, na.rm=T) # 19-73
+hist(demo2$age)
+
+```
+

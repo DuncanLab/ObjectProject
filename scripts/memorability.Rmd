@@ -21,11 +21,10 @@ library(lme4); library(lmerTest); library(tidyverse); library(data.table); libra
 getwd() # your current directory
 
 data_dir = "/Users/sarahberger/Desktop/ObjectProject/datafiles/" #path where data is stored; depending on where you're running the script, we will need to tweak this
-data_dir = "C:/Users/hanna/Documents/2019-2020/ObjectProject/datafiles/"
+data_dir = "~/2019-2020/O-MINDS/ObjectProject/datafiles"
 
-# load("C:/Users/hanna/Documents/2019-2020/ObjectProject/data_cleaned.RData")
-# load("C:/Users/hanna/Documents/2019-2020/ObjectProject/objproj_simulations.RData")
-load("C:/Users/hanna/Documents/2019-2020/ObjectProject/simulations.RData")
+setwd(data_dir)
+
 # load("/Users/sarahberger/Desktop/ObjectProject/simulations.RData")
 
 ```
@@ -59,7 +58,6 @@ data[grep(pattern = "batch_7.csv", x = filename, ), batch := 7 ]
 data[grep(pattern = "batch_8.csv", x = filename, ), batch := 8 ]
 data[grep(pattern = "batch_9.csv", x = filename, ), batch := 9 ]
 data[grep(pattern = "batch_10.csv", x = filename, ), batch := 10 ]
-
 
 #identify conditions
 data[grep(pattern = "emotional", x = filename, ), condition := "emotional" ]
@@ -104,8 +102,6 @@ data_full = copy(data) # create copy
 
 ```
 
-
-
 # Cleaning data
 
 ## Data cleaning round 1: removing participants who did not complete encoding phase
@@ -122,8 +118,6 @@ data = data[!participant %in% c(exclude_incomplete_encoding)]
 #now all participants have encoded 175 trials; 5 participants did not complete the full recognition phase, but we can include these subjects for now
 
 ```
-
-
 
 ## Data cleaning round 2: remove trials that were in the instruction slides
 
@@ -164,12 +158,6 @@ data = data[blockcode == "retrieval" & latency %between% cutoff_latency]
 
 ```
 
-```{r Save a copy before removing participants based on performance}
-
-data_unclean = copy(data)
-
-```
-
 ## Data cleaning round 4: removing participants with dprime below threshold
 
 ```{r calculate and visualize dprime (counting missed trials as incorrect)}
@@ -199,7 +187,7 @@ data = merge(data, stats_by_participant, by="participant")
 
 ```
 
-```{r Save a copy before you remove participants}
+```{r Save a copy before removing participants}
 
 data_unclean = copy(data)
 
@@ -215,6 +203,7 @@ print(cutoff_dprime) # 0.82541
 
 # look at the data above cutoff
 hist(stats_by_participant[dprime > cutoff_dprime]$dprime)
+
 ```
 
 ```{r exclude participants with dprime below cutoff}
@@ -236,6 +225,96 @@ length(unique(data$participant)) # participants remaining
 data_clean = copy(data)
 
 ```
+
+# Demographics information
+
+```{r Demographics for entire participant pool}
+
+demo_full = data_full[blockcode == 'demographics_block']
+demo_full = demo_full[trialcode != 'raceother'] # there were two, which interfered with pivot tables
+
+demo_full1 = demo_full %>%
+  group_by(participant, trialcode) %>%
+  select(participant, trialcode, response) %>%
+  pivot_wider(names_from = trialcode, values_from = response, values_fill = NA) %>%
+  mutate(gender = tolower(gender))
+
+# non-respondents, or unusual responses
+# View(demo_full1[!substr(demo_full1$gender, 1, 2) %in% c('fe','ma'),])
+# 10 did not respond
+# 3 participants flipped age-gender
+demo_full1[demo_full1$participant %in% c(115, 134, 321), c("gender","age")] = 
+  demo_full1[demo_full1$participant %in% c(115, 134, 321), c('age', 'gender')] 
+# 1 nonbinary
+# 2 binary but different spelling; resolved by taking first letter only + changing w to f
+# 1 keysmash (going to treat as a non-response)
+
+demo_full1[demo_full1$age == '',]$age = '0'
+
+demo_full2 = demo_full1 %>%
+  mutate(gender = substr(gender,1,1)) %>%
+  mutate(gender = case_when(gender == 'n' ~ 'n',
+                            gender %in% c('f','w') ~ 'f',
+                            gender == 'm' ~ 'm',
+                            !gender %in% c('f','m','w', 'n') ~ '.'),
+         age = as.numeric(as.character(age)))
+
+# number of participants
+nrow(demo_full2) # n=394
+
+# gender, in percentages
+table(demo_full2$gender)/(nrow(demo_full2))*100
+
+# age
+mean(demo_full2[demo_full2$age > 1,]$age)
+sd(demo_full2[demo_full2$age > 1,]$age)
+range(demo_full2[demo_full2$age > 1,]$age)
+hist(demo_full2[demo_full2$age > 1,]$age)
+
+```
+
+```{r Demographics for cleaned participant pool}
+
+demo = data_full[data_full$participant %in% data_clean$participant & blockcode == 'demographics_block']
+demo = demo[trialcode != 'raceother'] # there were two, which interfered with pivot tables
+
+demo1 = demo %>%
+  group_by(participant, trialcode) %>%
+  select(participant, trialcode, response) %>%
+  pivot_wider(names_from = trialcode, values_from = response, values_fill = NA) %>%
+  mutate(gender = tolower(gender))
+
+# 3 participants flipped age-gender
+demo1[demo1$participant %in% c(115, 134, 321), c("gender","age")] = 
+  demo1[demo1$participant %in% c(115, 134, 321), c('age', 'gender')] 
+# 1 nonbinary
+# 2 binary but different spelling; resolved by taking first letter only + changing w to f
+# 1 keysmash (going to treat as a non-response)
+
+demo1[demo1$age == '',]$age = '0'
+
+demo2 = demo1 %>%
+  mutate(gender = tolower(substr(gender,1,1))) %>%
+  mutate(gender = case_when(gender == 'n' ~ 'n',
+                            gender %in% c('f','w') ~ 'f',
+                            gender == 'm' ~ 'm',
+                            !gender %in% c('f','m','w', 'n') ~ '.'),
+         age = as.numeric(as.character(age)))
+
+# number of participants
+nrow(demo2) # n=284
+
+# gender, in percentages
+table(demo2$gender)/(nrow(demo2))*100
+
+# age
+mean(demo2[demo2$age > 1,]$age, na.rm=T)
+sd(demo2[demo2$age > 1,]$age)
+range(demo2[demo2$age > 1,]$age)
+hist(demo2[demo2$age > 1,]$age)
+```
+
+
 
 
 
