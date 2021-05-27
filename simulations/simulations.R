@@ -9,7 +9,7 @@ data_corrected = data_corrected[trialcode == "old_objects"]
 
 #create a vector with each individual subject and their hit rate
 HR_sub = data[, .(HR = mean(correct)), by = participant]
-HR_sub = sample_n(as.data.frame(HR_sub), 20, replace = TRUE)
+HR_sub = sample_n(as.data.frame(HR_sub), 20, replace = F)
 
 HR_sub$HR_2 = (HR_sub$HR - rnorm(1, mean = .1, sd = .1)) #condition 2 is 1 sd lower than cond 1
 HR_sub$HR_2[HR_sub$HR_2>=1] <- .999 #hit rate can't be above 1
@@ -20,108 +20,79 @@ HR_stim = data[, .(HR = mean(correct)), by = stimulus]
 
 stimpergroup = seq(1,51,5)
 
+data[, HR_stim := mean(correct), by = stimulus]
+data[HR_stim >= 1]$HR_stim <- .999
+data[, HR_sub := mean(correct), by = participant]
+data[HR_sub >= 1]$HR_sub <- .999
+data[, HR_sub2 := HR_sub - rnorm(1, mean = .1, sd = .1)]
+data[HR_sub2 >= 1]$HR_sub2 <- .999
+data = setDT(data)
+
 
 ####### with stimulus variability ######
 
 sim_SPC_iter <- function (n_iter = 5) { #input how many iterations to run
   
-  ef1=as.data.frame(matrix(nrow=n_iter*nrow(HR_sub)*length(stimpergroup),ncol=5))
-  colnames(ef1) <- c("iteration","stimpergroup","subject","stimulus","correct")
-  
-  ef2=as.data.frame(matrix(nrow=n_iter*nrow(HR_sub)*length(stimpergroup),ncol=5))
-  colnames(ef2) <- c("iteration","stimpergroup","subject","stimulus","correct")
-  
-  eflist = list()
-
-  stim1index = 0
-  stim2index = 0
+  ef=as.data.frame(matrix(nrow=0,ncol=6))
+  colnames(ef) <- c("iteration","stimpergroup","participant","stimulus","pred_cor","cond")
   
   for (h in c(1:n_iter)){  
     
-    print(paste("iteration =", h))
-    stimindex = 0
-    for (i in stimpergroup){ # 1-50 stim per group, going up by 5 each time
-      #print(paste("number of stimuli per group =", i))
+    print(paste("iteration:", h))
+    
+    for (i in stimpergroup){
       
-      stimindex = stimindex+1
+      cond1_stim = sample(HR_stim$stimulus, size = i, replace = F) # sample each stimulus i times with replacement
+      cond2_stim = sample(HR_stim[!HR_stim$stimulus %in% cond1_stim,]$stimulus, size = i, replace = F)
       
-      for (j in HR_sub$participant){
-        
-        #print(paste("current participant =", j))
-        
-        cond1_stim = sample(HR_stim$stimulus, size = i, replace = TRUE) # sample each stimulus i times with replacement
-        cond2_stim = sample(HR_stim$stimulus, size = i, replace = TRUE)
-
-        
-        for (stim1 in cond1_stim){
-          stim1index = stim1index +1
-          
-          prob1_stim = HR_stim[stimulus == stim1]$HR #probability of getting that stimulus correct
-          odds1_stim = (prob1_stim/(1-prob1_stim)) #odds of getting that stimulus correct
-          prob1_sub = HR_sub[participant == j]$HR #probability participant is correct
-          odds1_sub = (prob1_sub/(1-prob1_sub)) #odds participant is correct
-          
-          los = (log(odds1_stim) + log(odds1_sub))/2 #log odds sum
-          odds1 = exp(los) 
-          prob1 = odds1/(1+odds1) #convert log odds back to probability
-          
-          cond1_correct = rbinom(1, 1, prob = prob1) 
-          
-          
-          ef1[stim1index,1] = h
-          ef1[stim1index,2] = i
-          ef1[stim1index,3] = j
-          ef1[stim1index,4] = stim1
-          ef1[stim1index,5] = cond1_correct
-          #cond1 = append(cond1, cond1_correct)
-          }
-        
-        for (stim2 in cond2_stim){
-          
-          stim2index = stim2index +1
-          
-          prob2_stim = HR_stim[stimulus == stim2]$HR #probability of getting that stimulus correct
-          odds2_stim = (prob2_stim/(1-prob2_stim)) #odds of getting that stimulus correct
-          prob2_sub = HR_sub[participant == j]$HR_2 #probability participant is correct
-          odds2_sub = (prob2_sub/(1-prob2_sub)) #odds participant is correct
-          
-          los2 = (log(odds2_stim) + log(odds2_sub))/2 #log odds sum
-          odds2 = exp(los2) 
-          prob2 = odds2/(1+odds2) #convert log odds back to probability
-          
-          cond2_correct = rbinom(1, 1, prob = prob2)
-          
-          ef2[stim2index,1] = h
-          ef2[stim2index,2] = i
-          ef2[stim2index,3] = j
-          ef2[stim2index,4] = stim2
-          ef2[stim2index,5] = cond2_correct
-          
-          #cond2 = append(cond2, cond2_correct)
-          
-        }
-      }
-      #ef[h,stimindex] = cohen.d(cond1, cond2, paired = T, na.rm = T)$estimate
-      #cond1 = vector()
-      #cond2 = vector()
+      # create dataframe with both the HR_stim$HR and HR_sub$HR, called df here, but can replace
+      tmp = data %>%
+        # label condition + only grab relevant stimuli
+        mutate(cond = case_when(stimulus %in% cond1_stim ~ 1,
+                                stimulus %in% cond2_stim ~ 2)) %>%
+        filter(!is.na(cond)) %>%
+        # get prob and odds by stimulus
+        group_by(stimulus, cond) %>% 
+        mutate(prob_stim = mean(HR_stim), # should only be one value
+               odds_stim = prob_stim / (1 - prob_stim)) %>%
+        # get prob and odds by participant
+        group_by(participant, cond) %>%
+        mutate(prob_sub = case_when(cond == 1 ~ mean(HR_sub),
+                                    cond == 2 ~ mean(HR_sub2)),# should only be one value?
+               odds_sub = prob_sub / (1 - prob_sub)) %>%
+        # get odds and prob for all stimuli-participant combos, and the predicted correct
+        group_by(participant, stimulus, cond) %>%
+        mutate(los = (log(odds_stim) + log(odds_sub))/2,
+               odds = exp(los),
+               prob = odds/(1+odds),
+               pred_cor = rbinom(1, 1, prob = prob)) 
+      
+      # grab the columns you want
+      tmp1 <- tmp %>%
+        select(c(participant, stimulus, cond, pred_cor)) %>%
+        mutate(iteration = h,
+               stimpergroup = i)
+      
+      ef <- rbind(ef, tmp1)
+      
+      # then rbind to the big dataframe
+      
     }
   }
-  eflist = list(ef1,ef2)
-  return(eflist)
+  return(ef)
 }
 
-w_stim_var = sim_SPC_iter(n_iter = 100)
+w_stim_var = sim_SPC_iter(n_iter = 2)
 
-ef1 = setDT(w_stim_var[[1]])
-ef2 = setDT(w_stim_var[[2]])
+stimvartable = w_stim_var[cond==1, cond1_mean := mean(pred_cor), by = .(iteration, participant, stimpergroup)][
+  cond==2, cond2_mean := mean(pred_cor), by = .(iteration, participant, stimpergroup)]
+stimvartable = stimvartable[, .(cond1_mean, cond2_mean, iteration, participant, stimpergroup)]
 
-mean(ef1$correct, na.rm = T)
-mean(ef2$correct, na.rm = T)
 
-to_join_1 = ef1[, .(cond1_mean = mean(correct)), by = .(iteration, subject, stimpergroup)]
-to_join_2 = ef2[, .(cond2_mean = mean(correct)), by = .(iteration, subject, stimpergroup)]
-
-stimvartable = left_join(to_join_1,to_join_2)
+stimvartable = stimvartable %>%
+  pivot_wider(names_from = cond, values_from = mean)
+stimvartable$cond1_mean = stimvartable$`1`
+stimvartable$cond2_mean = stimvartable$`2`
 
 cohensdtestrun = as.data.frame(matrix(ncol=11))
 colnames(cohensdtestrun) <- c(stimpergroup)
@@ -1160,4 +1131,6 @@ sim_plot <- ggplot(sim_plot_dat, aes(x = as.numeric(stim_per_group), y = Effect_
   ylab("Effect Size")
 
 ggsave(sim_plot, filename = "sim_plot.png", width = 10, height = 5)
+
+sim_plot <- ggplot(sim)
 
