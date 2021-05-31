@@ -8,15 +8,15 @@ data_corrected = setDT(read.csv("data_corrected.csv"))
 data_corrected = data_corrected[trialcode == "old_objects"]
 
 #create a vector with each individual subject and their hit rate
-HR_sub = data[, .(HR = mean(correct)), by = participant]
+HR_sub = data[, .(HR_sub = mean(correct)), by = participant]
 HR_sub = sample_n(as.data.frame(HR_sub), 20, replace = F)
 
-HR_sub$HR_2 = (HR_sub$HR - rnorm(1, mean = .1, sd = .1)) #condition 2 is 1 sd lower than cond 1
+HR_sub$HR_2 = (HR_sub$HR_sub - rnorm(1, mean = .1, sd = .1)) #condition 2 is 1 sd lower than cond 1
 HR_sub$HR_2[HR_sub$HR_2>=1] <- .999 #hit rate can't be above 1
 HR_sub = setDT(HR_sub)
 
 #create a vector with each individual stimulus and their hit rate
-HR_stim = data[, .(HR = mean(correct)), by = stimulus]
+HR_stim = data[, .(HR_stim = mean(correct)), by = stimulus]
 
 stimpergroup = seq(1,51,5)
 
@@ -28,6 +28,8 @@ data[, HR_sub2 := HR_sub - rnorm(1, mean = .1, sd = .1)]
 data[HR_sub2 >= 1]$HR_sub2 <- .999
 data = setDT(data)
 
+# This dataframe will have all combinations of stimulus hit rates and participant hit rates
+combined = crossing(HR_stim, HR_sub)
 
 ####### with stimulus variability ######
 
