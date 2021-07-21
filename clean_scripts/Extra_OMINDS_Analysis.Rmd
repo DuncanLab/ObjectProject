@@ -1,0 +1,442 @@
+---
+title: "Extra Exp O-MINDS Analyses"
+author: "Hyuna Cho"
+date: "20/07/2021"
+output: html_document
+---
+
+These analyses examine the differences in effect size memorability across the RANDOM and SOFTWARE conditions. 
+
+RANDOM = images were selected at random, and counterbalanced across batches (e.g. which images were seen in the old vs new conditions)
+SOFTWARE = images were selected using the O-MINDS software, to minimize variability, and counterbalanced across batches.
+
+# Load packages and data
+
+```{r Load packages and data}
+
+rm(list = ls()) # clear environment
+
+library(lme4)
+library(lmerTest)
+library(tidyverse)
+library(data.table) # used extensively for data cleaning and analysis
+library(dtplyr)
+library(effsize)
+library(pwr)
+library(Rmisc)
+library(car)
+
+retrieval <- read.csv("Extra_retrieval.csv") # currently in the cleaned folder
+
+retrieval <- as.data.table(retrieval)
+retrieval[, HR := mean(correct), by = participant] # hit rate by participant
+retrieval[, avg_mem := correct - HR, by = participant] # participant-corrected hit rate
+
+```
+
+```{r Split by condition}
+
+random = retrieval[condition == "random"]
+
+software = retrieval[condition == "software"]
+
+# useful for grabbing specific number of stimuli later
+tmp_software <- separate(data = software,
+                col = stimulus, sep = 1,
+                into = c("letter", "number"))
+tmp_software <- separate(data = tmp,
+                col = number, sep = ".jpg",
+                into = c("number", "jpg"))
+
+```
+
+
+
+# All Stimuli
+
+Paired Cohen's D comparing effect sizes of RANDOM and SOFTWARE conditions.
+
+```{r Effect size; all stimuli}
+
+# get avg correct/accuracy rates by participant
+all_HR <- retrieval[,.(mean = mean(correct)), 
+                               by = .(condition, participant, old_object_condition)]
+
+# RANDOM condition 3 vs 1 exposures (paired Cohen's D)
+all_cohensd_random_HR = cohen.d(
+  all_HR[condition == "random" & old_object_condition == 3]$mean, 
+  all_HR[condition == "random" & old_object_condition == 1]$mean, 
+  paired = T) # 0.94
+
+# SOFTWARE condition 3 vs 1 exposures (paired Cohen's D)
+all_cohensd_software_HR = cohen.d(
+  all_HR[condition == "software" & old_object_condition == 3]$mean, 
+  all_HR[condition == "software" & old_object_condition == 1]$mean, 
+  paired = T) # 0.86
+
+```
+
+ANOVA for interactions between # exposures and condition. # exposures is significant, but not condition or the interaction.
+
+```{r ANOVA for interactions; all stimuli}
+
+# compare 1 vs 3 exposures
+all_ANOVA = aov(correct ~ condition * old_object_condition,
+                data = retrieval[old_object_condition %in% c(1,3)])
+
+# different ways of examining output
+summary(all_ANOVA)
+model.tables(all_ANOVA, type = "means", se = T)
+TukeyHSD(all_ANOVA, which = "old_object_condition")
+
+```
+
+Power analysis
+TODO: Not sure where .437 and .525 came from. Is it the estimate from earlier?
+
+```{r Power analysis; all stimuli}
+
+# power analysis for random (n = )
+pwr.t.test(d = .437, sig.level = .05, power = .8, type = ("paired")) # all_cohensd_random_HR$estimate?
+
+# power analysis for software (n = )
+pwr.t.test(d = .525, sig.level = .05, power = .8, type = ("paired"))
+
+```
+
+
+
+# Estimate 10 per condition
+
+What happens if we used fewer stimuli per condition? Here, we simulate what may have occurred if we presented participants with 10 images per condition.
+
+The software should select the best-matching 10, but randomly assigned groups may differ in which stimuli are selected. As such, we bootstrapped our random analyses, finding the average effect of random selection.
+
+```{r Function to grab 10 for the RANDOM condition}
+
+SelectRandomOld <- function(n=10){
+  
+  tmp = as.data.table(matrix(nrow=0, ncol=ncol(random)))
+  names(tmp) = names(random)
+  
+  for(b in 1:8){
+    tmp1 <- random[batch == b & old_object_condition == 3]
+    tmp1_stim <- as.vector(unique(tmp1$stimulus))
+    tmp1_sel <- sample(tmp1_stim, n)
+    # only grab if it was seen in the encoding phase?
+    tmp = rbind(tmp, random[stimulus %in% tmp1_sel & old_object_condition %in% c(1,3)], fill=T)
+  }
+  return(tmp)
+}
+
+SelectRandomAll <- function(n=10){
+  
+  tmp = as.data.table(matrix(nrow=0, ncol=ncol(random)))
+  names(tmp) = names(random)
+  
+  for(b in 1:8){
+    tmp1 <- random[batch == b & old_object_condition == 3]
+    tmp1_stim <- as.vector(unique(tmp1$stimulus))
+    tmp1_sel <- sample(tmp1_stim, n)
+    tmp = rbind(tmp, random[stimulus %in% tmp1_sel & old_object_condition %in% c(1,3,".")], fill=T)
+  }
+  return(tmp)
+}
+```
+
+```{r Grab 10 for the SOFTWARE condition}
+
+# tmp_software <- separate(data = software,
+#                 col = stimulus, sep = 1,
+#                 into = c("letter", "number"))
+# tmp_software <- separate(data = tmp,
+#                 col = number, sep = ".jpg",
+#                 into = c("number", "jpg"))
+
+# grab the first 10 items of each software-allocated group 
+software10 <- tmp_software[number %in% c(1:10) & old_object_condition %in% c(1,3,".")]
+
+# re-form the stimulus column
+software10$stimulus = with(software10, paste0(letter, number, ".jpg"))
+software10$letter = NULL
+software10$number = NULL
+software10$jpg = NULL
+
+```
+
+## Effect size using hit rate
+
+Paired Cohen's D comparing effect sizes of RANDOM and SOFTWARE conditions, if there were 10 stimuli per group.
+
+```{r Effect size using hit rate; randomly generated 10}
+
+# TODO: I made this into a function later on due to later analyses; Need to change inner variables.
+RandomSelectionEffectSize <- function(n_stim = 10, n_iter = 100){
+  effect_table_random <- c()
+
+  # simulate many times
+  for(i in 1:n_iter){
+    # get mean accuracy for 10 random stimuli
+    tmp = SelectRandomOld(n=n_stim)[, .(mean = mean(correct)), 
+                                      by = .(participant, old_object_condition)]
+    
+    # if they don't have a value for all 3 conditions, a paired samples effect size will not work
+    goodparticipants = tmp[, .N, by=participant]
+    goodparticipants = goodparticipants[N == 3,]$participant
+    
+    tmp = tmp[participant %in% goodparticipants]
+    
+    # find effect size
+    ef = cohen.d(tmp[old_object_condition == 3]$mean,
+                 tmp[old_object_condition == 1]$mean, paired = T)
+    
+    effect_table_random <- c(effect_table_random, ef$estimate)
+  }
+  return(effect_table_random)
+}
+
+random10_cohensd_HR = RandomSelectionEffectSize(n_stim = 10, n_iter = 100)
+
+
+# look at the effect sizes
+mean(random10_cohensd_HR)
+hist(random10_cohensd_HR)
+
+# calculate p-value (percentage of effect sizes above the software)
+length(random10_cohensd_HR[random10_cohensd_HR > software10_cohensd$estimate])/100
+
+```
+
+```{r Effect size using HR; 10 stimuli per group by software}
+
+# get avg correct/accuracy rates by participant
+software10_HR <- software_10[,.(mean = mean(correct)), 
+                               by = .(participant, old_object_condition)]
+
+# SOFTWARE condition 3 vs 1 exposures (paired Cohen's D)
+software10_cohensd = cohen.d(
+  software10_HR[old_object_condition == 3]$mean, 
+  software10_HR[old_object_condition == 1]$mean, 
+  paired = T) # 0.86
+
+```
+
+## Effect size, using corrected hit rate.
+
+```{r Effect size using corrected HR, randomly generated 10}
+
+random10_cohensd_corrHR <- c()
+
+# simulate multiple times
+for(i in 1:100){
+  # get mean accuracy for 10 random stimuli
+  random10 = SelectRandomOld(n=10)[, .(mean = mean(avg_mem)), 
+                                    by = .(participant, old_object_condition)]
+  
+  # if they don't have a value for all 3 conditions, a paired samples effect size will not work
+  goodparticipants = random10[, .N, by=participant]
+  goodparticipants = goodparticipants[N == 3,]$participant
+  
+  random10 = random10[participant %in% goodparticipants]
+  
+  # find effect size
+  ef = cohen.d(random10[old_object_condition == 3]$mean,
+               random10[old_object_condition == 1]$mean, 
+               paired = T)
+  random10_cohensd_corrHR <- c(random10_cohensd_corrHR, ef$estimate)
+}
+
+# look at the effect sizes
+mean(random10_cohensd_corrHR)
+hist(random10_cohensd_corrHR)
+
+# calculate p-value (percentage of effect sizes above the software)
+length(random10_cohensd_corrHR[random10_cohensd_corrHR > software10_cohensd$estimate])/100
+
+```
+
+```{r Effect size using corrected HR; 10 stim per group by software}
+
+software10_corrHR <- software_10[,.(mean = mean(avg_mem)),
+                               by = .(participant, old_object_condition)]
+
+# SOFTWARE condition 3 vs 1 exposures (paired Cohen's D)
+software10_cohensd_corrHR = cohen.d(
+  software10_corrHR[old_object_condition == 3]$mean, 
+  software10_corrHR[old_object_condition == 1]$mean, 
+  paired = T)
+
+
+```
+
+## Effect size, using dprime
+
+```{r dprime helper function}
+
+CalculateDprime <- function(dprime_table){
+  
+  stats_by_participant = dcast(dprime_table,
+                           value.var = "correct",
+                           participant ~ old_object_condition,
+                           fill=0,
+                           mean, na.rm=T)
+  
+  # stats_by_participant$V1 = NULL
+  names(stats_by_participant)[2:4] = c("FA", "HR_1", "HR_3") # rename to be more descriptive
+  stats_by_participant[, FA := 1-FA] # make FA column actually correspond to FA
+  stats_by_participant[FA==0, FA := 1/80][FA==1, FA := 1-(1/80)] # correct 0s and 1s
+  stats_by_participant[HR_1==0, HR_1 := 1/80][HR_1==1, HR_1 := 1-(1/80)]
+  stats_by_participant[HR_3==0, HR_3 := 1/80][HR_3==1, HR_3 := 1-(1/80)]
+  stats_by_participant[, dprime_1 := qnorm(HR_1) - qnorm(FA)]
+  stats_by_participant[, dprime_3 := qnorm(HR_3) - qnorm(FA)]
+  
+  return(stats_by_participant)
+}
+
+```
+
+
+```{r Effect size using dprime; randomly generated 10}
+
+random10_cohensd_dprime <- c()
+
+for (i in 1:100) {
+  
+  # 10 images per group; old and new
+  random10 = SelectRandomAll(n=10)
+  # dprime using participants' responses
+  random10_by_participant = CalculateDprime(random10)
+  
+  ef = cohen.d(random10_by_participant$dprime_3, 
+               random10_by_participant$dprime_1, 
+               paired = T)
+  effect_sizes <- c(random10_cohensd_dprime, ef$estimate)
+}
+
+mean(random10_cohensd_dprime)
+hist(random10_cohensd_dprime)
+
+```
+
+```{r Effect size using dprime; 10 stimuli per group by software}
+
+# Calculate dprime
+software10_dprime = CalculateDprime(software10)
+
+software10_cohensd_dprime = cohen.d(software10_dprime$dprime_3, 
+                                    software10_dprime$dprime_1, paired = T)
+
+```
+
+
+
+
+# Estimate 50 per condition
+
+We can re-use the function to get 50 random stimuli, but we'll have to make a new table for the top 50 stimuli selected by the software, per condition.
+
+```{r Grab 50 for the SOFTWARE condition}
+
+# Run if you have not run chunk 7 (get 10 for software condition)
+
+# tmp_software <- separate(data = software,
+#                 col = stimulus, sep = 1,
+#                 into = c("letter", "number"))
+# tmp_software <- separate(data = tmp,
+#                 col = number, sep = ".jpg",
+#                 into = c("number", "jpg"))
+
+software50 = tmp_software[number %in% c(1:50) & old_object_condition %in% c(1,3,".")]
+
+# re-form the stimulus column
+software50$stimulus = with(software50, paste0(letter, number, ".jpg"))
+software50$letter = NULL
+software50$number = NULL
+software50$jpg = NULL
+
+```
+
+TODO: repeat all chunks for calculating using HR, corrHR, and dprime under estimating 10
+
+
+
+# Plotting changes in effect size as the number of stimuli per condition increases
+
+## Create effect size change table
+
+```{r Initialize effect size change table}
+
+# the stimuli-per-group you're interested in looking at
+n_stim_list = seq(5,80,5)
+
+# create a table to populate; for both random and software
+plot_ef <- data.frame(matrix(ncol = 5, 
+                             nrow = length(n_stim_list)*2))
+colnames(plot_ef) <- c("stimpergroup","mean","group","CI_upper","CI_lower")
+plot_ef$stimpergroup <- rep(n_stim_list, each=2)
+plot_ef$group <- rep(c("Random","Software"))
+
+```
+
+```{r Simulate random values' effect size change}
+
+# NOTE: this takes a while
+for(i in n_stim_list){
+  rand = RandomSelectionEffectSize(n_stim = i, n_iter = 100)
+  sum_rand = CI(rand)
+  index = (i*2)-1
+  # add CI to plot_ef table
+  plot_ef[index, 2] = sum_rand[2] # mean
+  plot_ef[index, 4] = sum_rand[1] # upper
+  plot_ef[index, 5] = sum_rand[3] # lower
+}
+
+```
+
+```{r Simulate software values' effect size change}
+
+# for the software
+for(i in n_stim_list){
+  
+  sftwr = tmp_software[number %in% c(1:i), 
+                       .(mean = mean(avg_mem)), 
+                       by = .(participant, old_object_condition)] 
+  
+  sftwr_ef = cohen.d(sftwr[old_object_condition == 3]$mean, 
+                     sftwr[old_object_condition == 1]$mean, 
+                     paired = T)
+  # Add to plot_ef table
+  index = i*2
+  plot_ef[index, 2] = sftwr_ef$estimate
+}
+
+```
+
+## Plot changes
+
+```{r Plot effect sizes as number of stimuli per group increases}
+
+ef_graph <- ggplot(plot_ef, aes(x = stimpergroup, y = mean, color = group)) +
+  geom_line() +
+  ylab("effect size") +
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7)
+
+```
+
+```{r Power analyses}
+
+setDT(plot_ef)
+t.test(plot_ef[group == "Random" &stimpergroup == 5]$mean,plot_ef[group == "Software" & stimpergroup ==5]$mean)
+
+# power analysis for random (n = 13)
+pwr.t.test(d = plot_ef[group == "Random" & stimpergroup == 10]$mean, sig.level = .05, power = .8, type = ("paired"))
+
+# power analysis for software (n = 6)
+pwr.t.test(d = plot_ef[group == "Software" & stimpergroup ==10]$mean, sig.level = .05, power = .8, type = ("paired"))
+
+```
+
+
+
+
+

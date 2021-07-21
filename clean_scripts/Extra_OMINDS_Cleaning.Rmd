@@ -1,0 +1,117 @@
+---
+title: "Extra Exp O-MINDS S"
+author: "Hyuna Cho"
+date: "20/07/2021"
+output: html_document
+---
+
+This experiment examined whether using the software would make memorability more consistent between groups, increasing effect size.
+
+Participants (N=95) were presented with
+
+# Load data
+```{r Load packages}
+
+rm(list = ls()) # clear environment
+
+library(data.table) # Version 1.12.8
+
+data_dir = "~/data/" # relative to where the script is located
+
+```
+
+```{r Load data}
+
+relevantData = list.files(path = data_dir, full.names = TRUE)
+
+data = data.table()
+for (i in relevantData) {
+  df_temp = setDT(read.csv(i))
+  df_temp[, filename := i]
+  data = rbind(data, df_temp)
+}
+
+data = setDT(data)
+
+```
+
+# Clean data
+
+```{r Denote batches and remove unnecessary columns}
+
+data$group = NULL #remove group col
+
+#identify batches 
+data[grep(pattern = "extraexperiment_1_", x = filename, ), batch := 1 ]
+data[grep(pattern = "extraexperiment_2_", x = filename, ), batch := 2 ]
+data[grep(pattern = "extraexperiment_3_", x = filename, ), batch := 3 ]
+data[grep(pattern = "extraexperiment_4_", x = filename, ), batch := 4 ]
+data[grep(pattern = "extraexperiment_5_", x = filename, ), batch := 5 ]
+data[grep(pattern = "extraexperiment_6_", x = filename, ), batch := 6 ]
+data[grep(pattern = "extraexperiment_7_", x = filename, ), batch := 7 ]
+data[grep(pattern = "extraexperiment_8_", x = filename, ), batch := 8 ]
+data[grep(pattern = "extraexperiment_9_", x = filename, ), batch := 9 ]
+data[grep(pattern = "extraexperiment_10_", x = filename, ), batch := 10 ]
+data[grep(pattern = "extraexperiment_11_", x = filename, ), batch := 11 ]
+data[grep(pattern = "extraexperiment_12_", x = filename, ), batch := 12 ]
+data[grep(pattern = "extraexperiment_13_", x = filename, ), batch := 13 ]
+data[grep(pattern = "extraexperiment_14_", x = filename, ), batch := 14 ]
+data[grep(pattern = "extraexperiment_15_", x = filename, ), batch := 15 ]
+data[grep(pattern = "extraexperiment_16_", x = filename, ), batch := 16 ]
+
+to_assign_ids = data[, .N, keyby = .(batch, subject)]  
+to_assign_ids[, participant := 1:.N] #add new participant column
+to_assign_ids$N = NULL
+
+data = left_join(data, to_assign_ids)
+
+data = data %>% arrange(participant) %>% select(participant, everything()) # arrange by participant
+
+# remove unnecessary columns
+
+data$filename = NULL
+
+# rename key presses for retrieval phase to be interpretable
+data[blockcode == "retrieval" & response == "36", response := "old"]
+data[blockcode == "retrieval" & response == "37", response := "new"]
+
+
+```
+
+## Retrieval data cleaning
+
+Trials were eliminated if the response occurred before 300ms, or if they failed to respond by the end of the trial (2000ms).
+
+Participants were eliminated (N=17) if more than half of their trials (post-cleaning) were of abnormal latency, or if more than half th trials were not seen. This left 38 participants in the RANDOM group and 40 participants in the SOFTWARE group.
+
+```{r Retrieval data cleaning}
+
+retrieval = data[blockcode == "retrieval" & latency %between% c(300,1999)]
+
+exclude_incomplete_retrieval = retrieval[, .N, by = .(participant)][N < 160]$participant #more than half their trials were of abnormal latency or they didn't finish
+
+retrieval = retrieval[!participant %in% c(exclude_incomplete_retrieval)]
+
+# label conditions
+retrieval$condition = "random"
+retrieval[batch %in% c(9:16)]$condition = "software"
+
+```
+
+```{r Save retrieval data for later analyses}
+
+# remove unnecessary columns
+retrieval$subject = NULL
+retrieval$blockcode = NULL
+retrieval$trialcode = NULL
+retrieval$group = NULL
+retrieval$encoding_condition = NULL
+
+# label conditions
+retrieval$condition = "random" # batches 1-8
+retrieval[batch %in% c(9:16)]$condition = "software" # batches 9-16
+
+# create csv
+write.csv(retrieval, file = "Extra_retrieval.csv")
+
+```

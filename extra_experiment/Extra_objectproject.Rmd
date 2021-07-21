@@ -60,7 +60,7 @@ data[grep(pattern = "extraexperiment_14_", x = filename, ), batch := 14 ]
 data[grep(pattern = "extraexperiment_15_", x = filename, ), batch := 15 ]
 data[grep(pattern = "extraexperiment_16_", x = filename, ), batch := 16 ]
 
-to_assign_ids = data[, .N, keyby = .(subject, batch)] 
+to_assign_ids = data[, .N, keyby = .(batch, subject)] 
 to_assign_ids[, participant := 1:.N] #add new participant column
 to_assign_ids$N = NULL
 
