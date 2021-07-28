@@ -44,7 +44,7 @@ software = retrieval[condition == "software"]
 tmp_software <- separate(data = software,
                 col = stimulus, sep = 1,
                 into = c("letter", "number"))
-tmp_software <- separate(data = tmp,
+tmp_software <- separate(data = tmp_software,
                 col = number, sep = ".jpg",
                 into = c("number", "jpg"))
 
