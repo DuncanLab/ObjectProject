@@ -3,6 +3,8 @@ title: "Extra Exp O-MINDS S"
 author: "Hyuna Cho"
 date: "20/07/2021"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 This experiment examined whether using the software would make memorability more consistent between groups, increasing effect size.
@@ -16,7 +18,7 @@ rm(list = ls()) # clear environment
 
 library(data.table) # Version 1.12.8
 
-data_dir = "~/data/" # relative to where the script is located
+data_dir = "./data/" # relative to where the script is located
 
 ```
 
@@ -98,11 +100,25 @@ retrieval[batch %in% c(9:16)]$condition = "software"
 
 ```
 
-```{r}
+## calculate dprime
 
+Exclude participants with a dprime below zero
 
+```{r dprime}
+
+#calculate hit rate by participant
+
+dprime_df = retrieval[, .(HR = mean(correct)), by = participant]
+dprime_df[, FA := 1-HR]
+#there aren't any 1s or 0s to correct
+dprime_df[, dprime := qnorm(HR) - qnorm(FA)] 
+
+exclude_dprime = dprime_df[dprime <= 0]$participant #more than half their trials were of abnormal latency or they didn't finish
+
+retrieval = retrieval[!participant %in% c(exclude_dprime)]
 
 ```
+
 
 
 ```{r Save retrieval data for later analyses}
@@ -111,7 +127,6 @@ retrieval[batch %in% c(9:16)]$condition = "software"
 retrieval$subject = NULL
 retrieval$blockcode = NULL
 retrieval$trialcode = NULL
-retrieval$group = NULL
 retrieval$encoding_condition = NULL
 
 # label conditions
@@ -120,5 +135,10 @@ retrieval[batch %in% c(9:16)]$condition = "software" # batches 9-16
 
 # create csv
 write.csv(retrieval, file = "Extra_retrieval.csv")
+
+#number of participants per condition
+length(unique(retrieval[condition == "random"]$participant))
+length(unique(retrieval[condition == "software"]$participant))
+
 
 ```
