@@ -17,6 +17,7 @@ Participants (N=95) were presented with
 rm(list = ls()) # clear environment
 
 library(data.table) # Version 1.12.8
+library(tidyverse)
 
 data_dir = "./data/" # relative to where the script is located
 
@@ -135,6 +136,15 @@ retrieval[batch %in% c(9:16)]$condition = "software" # batches 9-16
 
 # create csv
 write.csv(retrieval, file = "Extra_retrieval.csv")
+
+#csv that includes all trials for each participant above dprime threshold (even abnormal trial latencies)
+extra_retrieval_full = data[!participant %in% c(exclude_dprime) & blockcode == "retrieval" ]
+
+# label conditions
+extra_retrieval_full$condition = "random" # batches 1-8
+extra_retrieval_full[batch %in% c(9:16)]$condition = "software" # batches 9-16
+write.csv(extra_retrieval_full, file = "extra_retrieval_full.csv")
+
 
 #number of participants per condition
 length(unique(retrieval[condition == "random"]$participant))
