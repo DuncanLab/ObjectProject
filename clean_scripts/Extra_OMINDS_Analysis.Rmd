@@ -453,10 +453,12 @@ retrieval_full <- setDT(retrieval_full)
 ### random
 
 app_values = read.csv("full_dt_pf.csv")
+setDT(app_values)
 
-app_values = select(app_values, stimulus, memorability, score_emotional, score_humanmade, score_outdoors, score_shoebox, h_index, unique)
+#app_values = select(app_values, stimulus, memorability, score_emotional, score_humanmade, score_outdoors, score_shoebox, h_index, unique)
 
 random = retrieval_full[condition == "random"]
+
 
 ### software
 
@@ -468,6 +470,15 @@ app_values_soft$stimulus = sapply(app_values_soft$newname, "[[", 2)
 app_values_soft = select(app_values_soft, stimulus, memorability, score_emotional, score_humanmade, score_outdoors, score_shoebox, h_index, unique)
 
 software = retrieval_full[condition == "software"]
+
+# useful for grabbing specific number of stimuli later
+tmp_software <- separate(data = software,
+                col = stimulus, sep = 1,
+                into = c("letter", "number"))
+tmp_software <- separate(data = tmp_software,
+                col = number, sep = ".jpg",
+                into = c("number", "jpg"))
+tmp_software$X = NULL
 
 ```
 
@@ -482,10 +493,12 @@ rand_diff_fun <- function(variable) {
 
   for(n in n_stim_list){ 
   
-    for (i in 1:100) {
+    for (i in 1:1000) {
       
-      random_selection = SelectRandomOld(n=n)
-      rand = left_join(random_selection, app_values)
+      rand = app_values[sample(nrow(app_values), 2*n), ] 
+      rand$old_object_condition <- 1
+      rand[1:n,]$old_object_condition <- 3
+      setDT(rand)
       rand = rand %>% select(!!variable, old_object_condition)
       colnames(rand) <- c("metric", "old_object_condition")
       mean_df = rand[, .(mean =mean(metric)), by = .(old_object_condition)]
@@ -543,18 +556,29 @@ mem_differences_soft <- soft_diff_fun(variable = "memorability")
 
 mem_differences$group = "Random"
 setDT(mem_differences)
-mem_differences = mem_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
+mem_differences_group = mem_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
 
 mem_differences_soft$group = "Software"
 
-plot_mem = rbind(mem_differences, mem_differences_soft, fill = TRUE)
+plot_mem = rbind(mem_differences_group, mem_differences_soft, fill = TRUE)
 
 
 mem_image <- ggplot(plot_mem, aes(x = n, y = diff, color = group)) +
   geom_line() +
-  ylab("mean memorability difference") +
+  ylab("Mean Memorability Difference") +
   geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
-  ggtitle("Difference in stimuli memorability between conditions")
+  ggtitle("Difference in stimuli memorability between conditions") +
+  theme_classic()
+
+###statistics
+
+mem_join <- left_join(mem_differences, mem_differences_soft, by = "n")
+
+mem_join[, compare := 0]
+mem_join[diff.x < diff.y , compare := 1]
+mem_join[, .(mean = mean(compare))]
+mem_join[, .(mean = mean(compare)), by = .(n)] #what percentage of simulated runs is the random value below the software value
+
 
 ```
 
@@ -572,11 +596,11 @@ emo_differences_soft <- soft_diff_fun(variable = "score_emotional")
 
 emo_differences$group = "Random"
 setDT(emo_differences)
-emo_differences = emo_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
+emo_differences_group = emo_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
 
 emo_differences_soft$group = "Software"
 
-plot_emo = rbind(emo_differences, emo_differences_soft, fill = TRUE)
+plot_emo = rbind(emo_differences_group, emo_differences_soft, fill = TRUE)
 
 emo_image <- ggplot(plot_emo, aes(x = n, y = diff, color = group)) +
   geom_line() +
@@ -584,9 +608,51 @@ emo_image <- ggplot(plot_emo, aes(x = n, y = diff, color = group)) +
   geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
   ggtitle("Difference in stimuli emotionality between conditions")
 
+###statistics
+
+emo_join <- left_join(emo_differences, emo_differences_soft, by = "n")
+
+emo_join[, compare := 0]
+emo_join[diff.x < diff.y , compare := 1]
+emo_join[, .(mean = mean(compare))]
+emo_join[, .(mean = mean(compare)), by = .(n)] #what percentage of simulated runs is the random below the software
+
 ```
 
 ## Nameability
+
+
+```{r find agreement level}
+
+#h-index is a measure of name agreement. 
+
+#Plot the h-index for condition 1 and condition 2 of the software
+
+soft = left_join(software[old_object_condition %in% c(1,3)], app_values_soft, by = 'stimulus')
+
+soft = soft[!duplicated(soft$stimulus),]
+
+ggplot(soft, aes(x = h_index, fill = old_object_condition)) +
+  geom_density(alpha=.3)
+
+
+#plot h-index density for all stimuli
+ggplot(app_values, aes(x = h_index)) +
+  geom_density(alpha=.3)
+
+#overlay the two plots
+
+soft[, group := "software"]
+
+combined_app_values <- rbind(soft, app_values, fill = TRUE)
+
+combined_app_values[is.na(group) == TRUE, group := "all"]
+
+ggplot(combined_app_values, aes(x = h_index, fill = group)) +
+  geom_density(alpha = .5)
+
+```
+
 
 ```{r run function - nameability}
 
@@ -613,4 +679,105 @@ name_image <- ggplot(plot_name, aes(x = n, y = diff, color = group)) +
 
 ```
 
+## Shoebox
 
+We need to run the software again, because we didn't select for any of the orientation questions
+
+```{r find agreement level - shoebox}
+
+#score shoebox is the average score of if it's larger or smaller than a shoebox. 1 = smaller than a shoebox, 0 = larger than a shoebox
+
+ggplot(soft, aes(x = score_shoebox, fill = old_object_condition)) +
+  geom_density(alpha=.3)
+
+
+#plot shoebox score density for all stimuli
+ggplot(app_values, aes(x = score_shoebox)) +
+  geom_density(alpha=.3)
+
+#overlay the two plots
+
+ggplot(combined_app_values, aes(x = score_shoebox, fill = group)) +
+  geom_density(alpha = .5)
+
+```
+
+
+```{r run function - shoebox}
+
+shoe_differences <- rand_diff_fun(variable = "score_shoebox")
+
+shoe_differences_soft <- soft_diff_fun(variable = "score_shoebox")
+```
+
+```{r plot nameability}
+
+shoe_differences$group = "Random"
+setDT(shoe_differences)
+shoe_differences = shoe_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
+
+shoe_differences_soft$group = "Software"
+
+plot_shoe = rbind(shoe_differences, shoe_differences_soft, fill = TRUE)
+
+shoe_image <- ggplot(plot_shoe, aes(x = n, y = diff, color = group)) +
+  geom_line() +
+  ylab("mean shoebox score difference") +
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
+  ggtitle("Difference in stimuli shoebox score between conditions")
+
+```
+
+## Human-made
+
+```{r run function - humanmade}
+
+human_differences <- rand_diff_fun(variable = "score_humanmade")
+
+human_differences_soft <- soft_diff_fun(variable = "score_humanmade")
+```
+
+```{r plot humanmade}
+
+human_differences$group = "Random"
+setDT(human_differences)
+human_differences = human_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
+
+human_differences_soft$group = "Software"
+
+plot_human = rbind(human_differences, human_differences_soft, fill = TRUE)
+
+human_image <- ggplot(plot_human, aes(x = n, y = diff, color = group)) +
+  geom_line() +
+  ylab("mean humanmade score difference") +
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
+  ggtitle("Difference in stimuli humanmade score between conditions")
+
+```
+
+## Outdoors
+
+```{r run function - outdoors}
+
+outdoors_differences <- rand_diff_fun(variable = "score_outdoors")
+
+outdoors_differences_soft <- soft_diff_fun(variable = "score_outdoors")
+```
+
+```{r plot outdoors}
+
+outdoors_differences$group = "Random"
+setDT(outdoors_differences)
+outdoors_differences = outdoors_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
+
+outdoors_differences_soft$group = "Software"
+
+plot_outdoors = rbind(outdoors_differences, outdoors_differences_soft, fill = TRUE)
+
+outdoors_image <- ggplot(plot_outdoors, aes(x = n, y = diff, color = group)) +
+  geom_line() +
+  ylab("mean outdoors score difference") +
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
+  ggtitle("Difference in stimuli outdoors score between conditions")
+
+```
