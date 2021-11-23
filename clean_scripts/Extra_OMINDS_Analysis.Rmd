@@ -27,6 +27,8 @@ library(effsize)
 library(pwr)
 library(Rmisc)
 library(car)
+library(esquisse)
+library(ggpubr)
 
 retrieval <- read.csv("Extra_retrieval.csv") # currently in the cleaned folder
 
@@ -383,14 +385,15 @@ plot_ef$group <- rep(c("Random","Software"))
 ```{r Simulate random values' effect size change}
 
 # NOTE: this takes a while
+index = 1
 for(i in n_stim_list){
-  rand = RandomSelectionEffectSize(n_stim = i, n_iter = 100)
+  rand = RandomSelectionEffectSize(n_stim = i, n_iter = 1000)
   sum_rand = CI(rand)
-  index = (i*2)-1
   # add CI to plot_ef table
   plot_ef[index, 2] = sum_rand[2] # mean
   plot_ef[index, 4] = sum_rand[1] # upper
   plot_ef[index, 5] = sum_rand[3] # lower
+  index = index + 2
 }
 
 ```
@@ -398,6 +401,7 @@ for(i in n_stim_list){
 ```{r Simulate software values' effect size change}
 
 # for the software
+index = 2
 for(i in n_stim_list){
   
   sftwr = tmp_software[number %in% c(1:i), 
@@ -408,8 +412,8 @@ for(i in n_stim_list){
                      sftwr[old_object_condition == 1]$mean, 
                      paired = T)
   # Add to plot_ef table
-  index = i*2
   plot_ef[index, 2] = sftwr_ef$estimate
+  index = index + 2
 }
 
 ```
@@ -437,6 +441,23 @@ pwr.t.test(d = plot_ef[group == "Random" & stimpergroup == 10]$mean, sig.level =
 pwr.t.test(d = plot_ef[group == "Software" & stimpergroup ==10]$mean, sig.level = .05, power = .8, type = ("paired"))
 
 ```
+
+```{r publication plots for effect size}
+
+esquisser()
+
+Effect_Sizes <- ggplot(plot_ef, aes(x = stimpergroup, y = mean, color = group)) +
+  geom_line() +
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7, color = "black") +
+  scale_color_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  theme_classic() +
+  labs(x = "Number of Stimuli Per Group", y = "Effect Size", color = "Group")
+  
+
+```
+
 
 # Circular logic: verify the software is working
 
@@ -563,12 +584,15 @@ mem_differences_soft$group = "Software"
 plot_mem = rbind(mem_differences_group, mem_differences_soft, fill = TRUE)
 
 
-mem_image <- ggplot(plot_mem, aes(x = n, y = diff, color = group)) +
+mem_plot <- ggplot(plot_mem, aes(x = n, y = diff, color = group)) +
   geom_line() +
-  ylab("Mean Memorability Difference") +
-  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
-  ggtitle("Difference in stimuli memorability between conditions") +
-  theme_classic()
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7, color = "black") +
+  scale_color_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  theme_classic() +
+  labs(x = "", y = "Mean \nMemorability \nDifference", color = "Assignment") +
+  theme(axis.title.y = element_text(angle=0))
 
 ###statistics
 
@@ -602,11 +626,15 @@ emo_differences_soft$group = "Software"
 
 plot_emo = rbind(emo_differences_group, emo_differences_soft, fill = TRUE)
 
-emo_image <- ggplot(plot_emo, aes(x = n, y = diff, color = group)) +
+emo_plot <- ggplot(plot_emo, aes(x = n, y = diff, color = group)) +
   geom_line() +
-  ylab("mean emotionality difference") +
-  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
-  ggtitle("Difference in stimuli emotionality between conditions")
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7, color = "black") +
+  scale_color_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  theme_classic() +
+  labs(x = "", y = "Mean \nEmotionality \nDifference", color = "Assignment") +
+  theme(axis.title.y = element_text(angle=0))
 
 ###statistics
 
@@ -624,16 +652,60 @@ emo_join[, .(mean = mean(compare)), by = .(n)] #what percentage of simulated run
 
 ```{r find agreement level}
 
-#h-index is a measure of name agreement. 
+####h-index is a measure of name agreement. 
 
-#Plot the h-index for condition 1 and condition 2 of the software
+##Plot the h-index for condition 1 and condition 2 of the software
 
 soft = left_join(software[old_object_condition %in% c(1,3)], app_values_soft, by = 'stimulus')
 
-soft = soft[!duplicated(soft$stimulus),]
+soft = soft[!duplicated(soft$stimulus),] #only need 1 row of the stimulus
 
 ggplot(soft, aes(x = h_index, fill = old_object_condition)) +
   geom_density(alpha=.3)
+
+# do this with only 20 stimuli per condition
+
+software20 <- tmp_software[number %in% c(1:20) & old_object_condition %in% c(1,3,".") ]
+software20 = software20[letter %in% c("A","B")]
+
+# re-form the stimulus column
+software20$stimulus = with(software20, paste0(letter, number, ".jpg"))
+software20 = left_join(software20, app_values_soft, by = "stimulus")
+software20 = software20[!duplicated(software20$stimulus),]
+
+ggplot(software20, aes(x = h_index, fill = old_object_condition)) +
+  geom_density(alpha=.3)
+
+software20$group <- "software"
+
+##Plot the h-index for a random foil
+
+rand = app_values[sample(nrow(app_values), 40), ] 
+rand$old_object_condition <- 1
+rand[1:20,]$old_object_condition <- 3
+
+#what's the mean difference between conditions? is it representative? If it was, it would be about 0.25
+
+mean_name = rand[, .(mean =mean(h_index)), by = .(old_object_condition)]
+abs(mean_name[old_object_condition == 3]$mean - mean_name[old_object_condition == 1]$mean)
+
+#save one that is close to 0.25
+rep_rand_name <- rand
+
+rep_rand_name$old_object_condition <- as.factor(rep_rand_name$old_object_condition)
+
+ggplot(rep_rand_name, aes(x = h_index, fill = old_object_condition)) +
+  geom_density(alpha=.3)
+
+rep_rand_name$group <- "Random"
+
+
+combined_name_20 <- rbind(rep_rand_name, software20, fill = TRUE)
+
+ggplot(combined_name_20, aes(x = h_index, fill = old_object_condition)) +
+  geom_density(alpha=.3) +
+  facet_grid(~group)
+
 
 
 #plot h-index density for all stimuli
@@ -651,6 +723,8 @@ combined_app_values[is.na(group) == TRUE, group := "all"]
 ggplot(combined_app_values, aes(x = h_index, fill = group)) +
   geom_density(alpha = .5)
 
+
+
 ```
 
 
@@ -665,119 +739,228 @@ name_differences_soft <- soft_diff_fun(variable = "h_index")
 
 name_differences$group = "Random"
 setDT(name_differences)
-name_differences = name_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
+name_differences_group = name_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
 
 name_differences_soft$group = "Software"
 
-plot_name = rbind(name_differences, name_differences_soft, fill = TRUE)
+plot_name = rbind(name_differences_group, name_differences_soft, fill = TRUE)
 
-name_image <- ggplot(plot_name, aes(x = n, y = diff, color = group)) +
+name_plot <- ggplot(plot_name, aes(x = n, y = diff, color = group)) +
   geom_line() +
-  ylab("mean nameability difference") +
-  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
-  ggtitle("Difference in stimuli nameability between conditions")
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7, color = "black") +
+  scale_color_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  theme_classic() +
+  labs(x = "Number of Stimuli Per Group", y = "Mean \nNameability \nDifference", color = "Assignment") +
+  theme(axis.title.y = element_text(angle=0))
+
+###statistics
+
+name_join <- left_join(name_differences, name_differences_soft, by = "n")
+
+name_join[, compare := 0]
+name_join[diff.x < diff.y , compare := 1]
+name_join[, .(mean = mean(compare))]
+name_join[, .(mean = mean(compare)), by = .(n)] #what percentage of simulated runs is the random below the software
+
+```
+
+```{r arrange plots for publication}
+
+Condition_Differences <- ggarrange(mem_plot, emo_plot, name_plot, nrow = 3, ncol = 1, common.legend = TRUE)
 
 ```
 
 ## Shoebox
 
-We need to run the software again, because we didn't select for any of the orientation questions
+We need to run the software again, because we didn't select for any of the orientation questions in the extra experiment. Here we ran the software with the only criteria selected being shoebox (no memorability, emotionality, etc.)
 
 ```{r find agreement level - shoebox}
 
+shoebox_summary <- read.csv("shoebox20_summary.csv")
+setDT(shoebox_summary)
 #score shoebox is the average score of if it's larger or smaller than a shoebox. 1 = smaller than a shoebox, 0 = larger than a shoebox
 
-ggplot(soft, aes(x = score_shoebox, fill = old_object_condition)) +
-  geom_density(alpha=.3)
+shoebox_summary[, agreement := abs(score_shoebox - .5) +.5]
+
+ggplot(shoebox_summary, aes(x = agreement)) +
+  geom_histogram() +
+  scale_x_continuous(limits = c(0,1.2))
 
 
 #plot shoebox score density for all stimuli
 ggplot(app_values, aes(x = score_shoebox)) +
-  geom_density(alpha=.3)
+  geom_histogram()
+
+#randomly select 160 stimuli and plot shoebox
+
+shoe_rand <- app_values[sample(nrow(app_values), 40), ]
+shoe_rand[, agreement := abs(score_shoebox - .5) +.5]
+
+ggplot(shoe_rand, aes(x = score_shoebox)) +
+  geom_histogram() +
+  scale_x_continuous(limits = c(0,1.2))
 
 #overlay the two plots
 
-ggplot(combined_app_values, aes(x = score_shoebox, fill = group)) +
-  geom_density(alpha = .5)
+shoebox_summary[, group := "software"]
+shoe_rand[, group := "random"]
+
+combined_shoe <- rbind(shoebox_summary, shoe_rand, fill = TRUE)
+
+ggplot(combined_shoe, aes(x = agreement, fill = group)) +
+  geom_density(alpha = .4) +
+  scale_x_continuous(name = "Shoebox Score Agreement")
 
 ```
 
-
-```{r run function - shoebox}
-
-shoe_differences <- rand_diff_fun(variable = "score_shoebox")
-
-shoe_differences_soft <- soft_diff_fun(variable = "score_shoebox")
-```
-
-```{r plot nameability}
-
-shoe_differences$group = "Random"
-setDT(shoe_differences)
-shoe_differences = shoe_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
-
-shoe_differences_soft$group = "Software"
-
-plot_shoe = rbind(shoe_differences, shoe_differences_soft, fill = TRUE)
-
-shoe_image <- ggplot(plot_shoe, aes(x = n, y = diff, color = group)) +
-  geom_line() +
-  ylab("mean shoebox score difference") +
-  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
-  ggtitle("Difference in stimuli shoebox score between conditions")
-
-```
 
 ## Human-made
 
-```{r run function - humanmade}
 
-human_differences <- rand_diff_fun(variable = "score_humanmade")
+```{r find agreement level - humanmade}
 
-human_differences_soft <- soft_diff_fun(variable = "score_humanmade")
+human_summary <- read.csv("humanmade20_summary.csv")
+setDT(human_summary)
+#score humanmade is the average score of if it's natural or humanmade. 1 = humanmade, 0 = natural
+
+human_summary[, agreement := abs(score_humanmade - .5) +.5]
+
+ggplot(human_summary, aes(x = agreement)) +
+  geom_histogram() +
+  scale_x_continuous(limits = c(0,1.2))
+
+
+#plot humanmade score density for all stimuli
+ggplot(app_values, aes(x = score_humanmade)) +
+  geom_histogram()
+
+#randomly select 20 stimuli per condition and plot humanmade scores
+
+human_rand <- app_values[sample(nrow(app_values), 40), ]
+human_rand[, agreement := abs(score_humanmade - .5) +.5]
+
+ggplot(human_rand, aes(x = score_humanmade)) +
+  geom_histogram() +
+  scale_x_continuous(limits = c(0,1.2))
+
+#overlay the two plots
+
+human_summary[, group := "software"]
+human_rand[, group := "random"]
+
+combined_human <- rbind(human_summary, human_rand, fill = TRUE)
+
+ggplot(combined_human, aes(x = agreement, fill = group)) +
+  geom_density(alpha = .4) +
+  scale_x_continuous(limits = c(0.49,1.01), name = "Humanmade Score Agreement")
+
 ```
 
-```{r plot humanmade}
 
-human_differences$group = "Random"
-setDT(human_differences)
-human_differences = human_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
-
-human_differences_soft$group = "Software"
-
-plot_human = rbind(human_differences, human_differences_soft, fill = TRUE)
-
-human_image <- ggplot(plot_human, aes(x = n, y = diff, color = group)) +
-  geom_line() +
-  ylab("mean humanmade score difference") +
-  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
-  ggtitle("Difference in stimuli humanmade score between conditions")
-
-```
 
 ## Outdoors
 
-```{r run function - outdoors}
+```{r find agreement level - outdoors}
 
-outdoors_differences <- rand_diff_fun(variable = "score_outdoors")
+outdoors_summary <- read.csv("outdoors20_summary.csv")
+setDT(outdoors_summary)
+#score outdoors is the average score of if it's normally found indoors or outdoors. 1 = outdoors, 0 = indoors
 
-outdoors_differences_soft <- soft_diff_fun(variable = "score_outdoors")
+outdoors_summary[, agreement := abs(score_outdoors - .5) +.5]
+
+ggplot(outdoors_summary, aes(x = agreement)) +
+  geom_histogram() +
+  scale_x_continuous(limits = c(0,1.2))
+
+
+#plot outdoors score density for all stimuli
+ggplot(app_values, aes(x = score_outdoors)) +
+  geom_histogram()
+
+#randomly select 160 stimuli and plot shoebox
+
+outdoors_rand <- app_values[sample(nrow(app_values), 40), ]
+outdoors_rand[, agreement := abs(score_outdoors - .5) +.5]
+
+ggplot(outdoors_rand, aes(x = score_outdoors)) +
+  geom_histogram() +
+  scale_x_continuous(limits = c(0,1.2))
+
+#overlay the two plots
+
+outdoors_summary[, group := "software"]
+outdoors_rand[, group := "random"]
+
+combined_outdoors <- rbind(outdoors_summary, outdoors_rand, fill = TRUE)
+
+ggplot(combined_outdoors, aes(x = agreement, fill = group)) +
+  geom_density(alpha = .4) +
+  scale_x_continuous(limits = c(0.49,1.01), name = "Outdoors Score Agreement")
+
 ```
 
-```{r plot outdoors}
+## Plots
+```{r make publication plots}
 
-outdoors_differences$group = "Random"
-setDT(outdoors_differences)
-outdoors_differences = outdoors_differences[, .(diff = mean(diff), CI_upper = CI(diff)[[1]], CI_lower= CI(diff)[[3]]), by = .(n, group)]
+esquisser()
 
-outdoors_differences_soft$group = "Software"
+shoe_plot <- combined_shoe %>%
+ filter(humanmade_response %in% c("human-made", "natural") | is.na(humanmade_response)) %>%
+ filter(outdoors_response %in% c("outdoors", "indoors") | is.na(outdoors_response)) %>%
+ ggplot() +
+  aes(x = agreement, fill = group, colour = group) +
+  geom_density(adjust = 0.4, alpha = .4) +
+  scale_fill_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  scale_color_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  labs(x = "Shoebox Score Agreement", y = "Frequency", fill = "Assignment", color = "Assignment") +
+  theme_classic() 
 
-plot_outdoors = rbind(outdoors_differences, outdoors_differences_soft, fill = TRUE)
+human_plot <- combined_human %>%
+ggplot() +
+  aes(x = agreement, fill = group, colour = group) +
+  geom_density(adjust = 0.4, alpha = .4) +
+  scale_fill_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  scale_color_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  labs(x = "Human-made Score Agreement", y = "", fill = "Assignment", color = "Assignment") +
+  theme_classic() 
 
-outdoors_image <- ggplot(plot_outdoors, aes(x = n, y = diff, color = group)) +
-  geom_line() +
-  ylab("mean outdoors score difference") +
-  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
-  ggtitle("Difference in stimuli outdoors score between conditions")
+outdoors_plot <- combined_outdoors %>%
+ggplot() +
+  aes(x = agreement, fill = group, colour = group) +
+  geom_density(adjust = 0.4, alpha = .4) +
+  scale_fill_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  scale_color_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  labs(x = "Indoor/Outdoor Score Agreement", y = "Frequency", fill = "Assignment", color = "Assignment") +
+  theme_classic()
+
+name_plot <- combined_name_20 %>%
+  ggplot() +
+  aes(x = h_index, fill = group, colour = group) +
+  geom_density(adjust = 0.4, alpha = .4) +
+  scale_fill_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  scale_color_manual(
+    values = c("#F6B254","#674AEE"), labels = c("Random", "Software")
+  ) +
+  labs(x = "H-Index", y = "", fill = "Assignment", color = "Assignment") +
+  theme_classic()
+
+agreement <- ggarrange(shoe_plot,human_plot, outdoors_plot, name_plot, nrow = 2, ncol = 2, common.legend = TRUE, labels = c("A","B","C", "D"))
 
 ```
+
