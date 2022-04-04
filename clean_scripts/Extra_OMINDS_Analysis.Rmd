@@ -60,6 +60,7 @@ tmp_software <- separate(data = tmp_software,
 
 Paired Cohen's D comparing effect sizes of RANDOM and SOFTWARE conditions.
 
+When we compare the conditions (1 vs 3) in Random and Software, we find that there's a larger effect size in the random condition.
 ```{r Effect size; all stimuli}
 
 # get avg correct/accuracy rates by participant
@@ -180,7 +181,7 @@ RandomSelectionEffectSize <- function(n_stim = 10, n_iter = 100){
 
   # simulate many times
   for(i in 1:n_iter){
-    # get mean accuracy for 10 random stimuli
+    # get mean accuracy for n random stimuli
     tmp = SelectRandomOld(n=n_stim)[, .(mean = mean(correct)), 
                                       by = .(participant, old_object_condition)]
     
@@ -371,7 +372,7 @@ TODO: repeat all chunks for calculating using HR, corrHR, and dprime under estim
 ```{r Initialize effect size change table}
 
 # the stimuli-per-group you're interested in looking at
-n_stim_list = seq(5,80,5)
+n_stim_list = seq(1,80,1)
 
 # create a table to populate; for both random and software
 plot_ef <- data.frame(matrix(ncol = 5, 
@@ -384,10 +385,19 @@ plot_ef$group <- rep(c("Random","Software"))
 
 ```{r Simulate random values' effect size change}
 
-# NOTE: this takes a while
 index = 1
+iter = 1000
+
+# NOTE: recording each value for each nstim and iter
+random_effsize <- as.data.frame(matrix(data=NA, nrow=iter, ncol = length(n_stim_list)))
+names(random_effsize) <- n_stim_list
+
+# NOTE: this takes a while (~1h)
 for(i in n_stim_list){
-  rand = RandomSelectionEffectSize(n_stim = i, n_iter = 1000)
+  rand = RandomSelectionEffectSize(n_stim = i, n_iter = iter)
+  
+  random_effsize[,paste0(i)] = rand
+  
   sum_rand = CI(rand)
   # add CI to plot_ef table
   plot_ef[index, 2] = sum_rand[2] # mean
@@ -396,13 +406,15 @@ for(i in n_stim_list){
   index = index + 2
 }
 
+# plot_ef = read.csv("plotef_full.csv") # pre-simulated results
+
 ```
 
 ```{r Simulate software values' effect size change}
 
 # for the software
-index = 2
-for(i in n_stim_list){
+index = 2*3
+for(i in n_stim_list[-c(1,2)]){
   
   sftwr = tmp_software[number %in% c(1:i), 
                        .(mean = mean(avg_mem)), 
@@ -425,17 +437,66 @@ for(i in n_stim_list){
 ef_graph <- ggplot(plot_ef, aes(x = stimpergroup, y = mean, color = group)) +
   geom_line() +
   ylab("effect size") +
-  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7)
+  geom_errorbar(aes(ymin=CI_lower, ymax=CI_upper), width = .7) +
+  
+  
 
 ```
+
+```{r}
+
+# Calculate average % increase in effect size across the numbers we have 
+# NOTE: 1 and 2 aren't working since uneven numbers of images for 1 and 2
+mean((plot_ef[plot_ef$stimpergroup > 2 & plot_ef$group == "Software", "mean"] - plot_ef[plot_ef$stimpergroup > 2 & plot_ef$group == "Random", "mean"] ) * 100) # 52.5883
+
+
+# Calculate how many simulations (random) are smaller than software effect sizes
+sftwr_effsize <- as.data.frame(t(plot_ef[plot_ef$stimpergroup > 2 & plot_ef$group == "Software", "mean"]))
+names(sftwr_effsize) <- seq(3,80,1)
+
+all_effsize <- rbind(sftwr_effsize, random_effsize[-c(1,2)])
+
+random_effsize[-c(1,2)] < sftwr_effsize
+
+t_random_effsize = t(random_effsize[-c(1,2)])
+t_sftwr_effsize = t(sftwr_effsize)
+
+t_cmpr_effsize = as.data.frame(matrix(data = NA, nrow = 2, ncol = ncol(t_random_effsize)))
+names(t_cmpr_effsize) = names(t_random_effsize)
+
+for(i in 1:nrow(t_random_effsize)){
+  tmp = t_random_effsize[i,] < t_sftwr_effsize[i]
+  t_cmpr_effsize = rbind(t_cmpr_effsize, tmp)
+  
+}
+
+# How many times (out of simulated) is it smaller? nearly all of the time
+mean(apply(t(t_cmpr_effsize[-c(1,2),]), 2, sum))
+
+```
+
 
 ```{r Power analyses}
 
 setDT(plot_ef)
+
 t.test(plot_ef[group == "Random" &stimpergroup == 5]$mean,plot_ef[group == "Software" & stimpergroup ==5]$mean)
+
+# HOW MANY SUBJ ARE NEEDED?
 
 # power analysis for random (n = 13)
 pwr.t.test(d = plot_ef[group == "Random" & stimpergroup == 10]$mean, sig.level = .05, power = .8, type = ("paired"))
+
+# power analysis for software (n = 6)
+pwr.t.test(d = plot_ef[group == "Software" & stimpergroup ==10]$mean, sig.level = .05, power = .8, type = ("paired"))
+
+
+
+# HOW MUCH POWER DO WE HAVE?
+
+pwr.t.test(
+  n = 
+  d = plot_ef[group == "Random" & stimpergroup == 10]$mean, sig.level = .05, power = .8, type = ("paired"))
 
 # power analysis for software (n = 6)
 pwr.t.test(d = plot_ef[group == "Software" & stimpergroup ==10]$mean, sig.level = .05, power = .8, type = ("paired"))
@@ -467,7 +528,7 @@ Is the software minimizing variability between the two conditions more than the 
 
 # get full data frame (includes all trials)
 
-retrieval_full <- read.csv("extra_retrieval_full.csv") # currently in the cleaned folder
+retrieval_full <- read.csv("clean_scripts/extra_retrieval_full.csv") # currently in the cleaned folder
 retrieval_full <- setDT(retrieval_full)
 
 
